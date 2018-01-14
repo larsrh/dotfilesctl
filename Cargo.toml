@@ -1,0 +1,10 @@
+[package]
+name = "dotfilesctl"
+version = "0.1.0"
+authors = ["Lars Hupel <lars@hupel.info>"]
+
+[dependencies]
+clap = "2.29.1"
+notify = "4.0.0"
+notify-rust = "3"
+xdg = "^2.1"
