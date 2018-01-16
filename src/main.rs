@@ -1,5 +1,6 @@
 #[macro_use] extern crate clap;
 #[macro_use] extern crate failure;
+extern crate notify;
 #[macro_use] extern crate proptest;
 #[macro_use] extern crate serde_derive;
 extern crate toml;

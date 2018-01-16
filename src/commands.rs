@@ -1,8 +1,12 @@
 use failure::Error;
+use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use std::fmt;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::PathBuf;
+use std::sync::mpsc::channel;
+use std::time::Duration;
+use paths::*;
 use toml;
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -62,6 +66,19 @@ pub fn init(config: PathBuf, target: PathBuf, force: bool) -> Result<(), Error> 
 }
 
 pub fn watch(config: PathBuf) -> Result<(), Error> {
-    let _ = check_config(&config);
-    Ok(())
+    let config = check_config(&config)?;
+    let (tx, rx) = channel();
+    let mut watcher: RecommendedWatcher = Watcher::new(tx, Duration::from_secs(2))?;
+    println!("Watching file changes in target {}", config.target.to_string_lossy());
+    watcher.watch(config.target.clone(), RecursiveMode::Recursive)?;
+    loop {
+        let event = rx.recv()?;
+        match event {
+            DebouncedEvent::Create(created) => {
+                let relative = relative_to(config.target.as_path(), created.as_path());
+                println!("File created: {}", relative.to_string_lossy())
+            },
+            _ => {}
+        }
+    }
 }
