@@ -12,9 +12,7 @@ struct Config {
 
 impl Config {
     fn new(target: PathBuf) -> Config {
-        Config {
-            target: target
-        }
+        Config { target }
     }
 }
 
@@ -32,9 +30,7 @@ impl fmt::Display for DotfilesError {
 
 impl DotfilesError {
     fn new(description: String) -> DotfilesError {
-        DotfilesError {
-            description: description
-        }
+        DotfilesError { description }
     }
 }
 
