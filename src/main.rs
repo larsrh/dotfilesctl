@@ -1,10 +1,12 @@
 #[macro_use] extern crate clap;
 #[macro_use] extern crate failure;
+#[macro_use] extern crate proptest;
 #[macro_use] extern crate serde_derive;
 extern crate toml;
 extern crate xdg;
 
 mod commands;
+mod paths;
 
 use clap::{Arg, App, SubCommand};
 use std::path::PathBuf;

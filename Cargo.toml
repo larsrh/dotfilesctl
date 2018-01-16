@@ -5,10 +5,11 @@ authors = ["Lars Hupel <lars@hupel.info>"]
 
 [dependencies]
 clap = "2.29.1"
+failure = "0.1.1"
 notify = "4.0.0"
 notify-rust = "3"
-xdg = "^2.1"
-toml = "0.4.5"
+proptest = "^0.4"
 serde = "1.0"
 serde_derive = "1.0"
-failure = "0.1.1"
+toml = "0.4.5"
+xdg = "^2.1"
