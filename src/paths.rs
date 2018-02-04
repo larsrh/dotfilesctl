@@ -18,7 +18,7 @@ pub fn relative_to(from: &Path, to: &Path) -> PathBuf {
 
 pub fn canonicalize_light<P: AsRef<Path>>(path: P) -> PathBuf {
     let mut buf = PathBuf::new();
-    path.as_ref().components().for_each(|component| {
+    for component in path.as_ref().components() {
         match component {
             Component::Prefix(_) | Component::RootDir | Component::Normal(_) =>
                 buf.push(PathBuf::from(component.as_os_str())),
@@ -32,7 +32,7 @@ pub fn canonicalize_light<P: AsRef<Path>>(path: P) -> PathBuf {
                     buf.pop();
                 }
         };
-    });
+    };
     buf
 }
 

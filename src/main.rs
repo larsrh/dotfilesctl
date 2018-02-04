@@ -22,7 +22,7 @@ static APP_NAME: &'static str = crate_name!();
 
 fn main() {
     let mut builder = pretty_env_logger::formatted_builder().unwrap();
-    builder.filter(None, LevelFilter::Info);
+    builder.filter(None, LevelFilter::Debug);
     builder.init();
 
     let init_command =
