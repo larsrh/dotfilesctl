@@ -1,5 +1,7 @@
 use failure::Error;
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
+use std::collections::HashMap;
+use std::env;
 use std::fmt;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
@@ -26,6 +28,23 @@ impl Config {
 
     fn contents(&self) -> PathBuf {
         self.target.join("contents")
+    }
+}
+
+enum SymlinkStatus {
+    Ok,
+    Absent(Error),
+    Wrong
+}
+
+struct Symlink {
+    expected: PathBuf,
+    status: SymlinkStatus
+}
+
+impl Symlink {
+    fn new(expected: PathBuf, status: SymlinkStatus) -> Symlink {
+        Symlink { expected, status }
     }
 }
 
@@ -59,6 +78,28 @@ impl Dotfiles {
             else {
                 Some(dotfile.clone())
             }
+        }).collect()
+    }
+
+    fn get_symlinks(&self, contents: &Path, home: &Path) -> HashMap<PathBuf, Symlink> {
+        self.get_files().iter().map(|dotfile| {
+            let expected = contents.join(dotfile);
+            let symlink = home.join(dotfile);
+            let result = match symlink.symlink_metadata() {
+                Ok(_) =>
+                    match symlink.read_link() {
+                        Ok(actual) =>
+                            Symlink::new(
+                                expected.clone(),
+                                if expected == actual { SymlinkStatus::Ok } else { SymlinkStatus::Wrong }
+                            ),
+                        Err(_) =>
+                            Symlink::new(expected, SymlinkStatus::Wrong)
+                    },
+                Err(err) =>
+                    Symlink::new(expected, SymlinkStatus::Absent(Error::from(err)))
+            };
+            (dotfile.clone(), result)
         }).collect()
     }
 }
@@ -159,6 +200,25 @@ pub fn check(config: PathBuf, thorough: bool) -> Result<(), Error> {
         let err = DotfilesError::new(msg);
         Err(err)?
     }
+
+    let home = env::home_dir().unwrap();
+    info!("Checking for symlinks in {:?}", home);
+    let symlinks = dotfiles.get_symlinks(config.contents().as_path(), home.as_path());
+    for (dotfile, symlink) in &symlinks {
+        match symlink.status {
+            SymlinkStatus::Wrong => {
+                let msg = format!("{:?} is not a symbolic link or symbolic link with wrong target, expected: {:?}", dotfile, symlink.expected);
+                let err = DotfilesError::new(msg);
+                Err(err)?
+            },
+            SymlinkStatus::Absent(ref err) => {
+                let msg = format!("{:?} does not exist, expected symbolic link to {:?} ({:?})", dotfile, symlink.expected, err);
+                Err(DotfilesError::new(msg))?
+            },
+            SymlinkStatus::Ok => ()
+        }
+    }
+    info!("{} symlinks correct.", symlinks.len());
 
     save_dotfiles(&config, dotfiles)?;
     Ok(())
