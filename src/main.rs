@@ -1,6 +1,9 @@
 #[macro_use] extern crate clap;
+extern crate env_logger;
 #[macro_use] extern crate failure;
+#[macro_use] extern crate log;
 extern crate notify;
+extern crate pretty_env_logger;
 #[macro_use] extern crate proptest;
 #[macro_use] extern crate serde_derive;
 extern crate tempdir;
@@ -11,12 +14,17 @@ mod commands;
 mod paths;
 
 use clap::{Arg, App, SubCommand};
+use log::LevelFilter;
 use std::path::PathBuf;
 
 static APP_VERSION: &'static str = crate_version!();
 static APP_NAME: &'static str = crate_name!();
 
 fn main() {
+    let mut builder = pretty_env_logger::formatted_builder().unwrap();
+    builder.filter(None, LevelFilter::Info);
+    builder.init();
+
     let init_command =
         SubCommand::with_name("init")
             .arg(Arg::with_name("force")
@@ -78,6 +86,6 @@ fn main() {
 
     match result {
         Ok(()) => (),
-        Err(err) => println!("{}", err)
+        Err(err) => error!("{}", err)
     }
 }

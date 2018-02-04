@@ -45,11 +45,15 @@ impl Dotfiles {
         Dotfiles { files }
     }
 
-    fn canonicalize(&self) -> Dotfiles {
+    fn get_files(&self) -> Vec<PathBuf> {
         match self.files {
-            Some(_) => Dotfiles::new(self.files.clone()),
-            None => Dotfiles::new(Some(vec![]))
+            Some(ref files) => files.clone(),
+            None => vec![]
         }
+    }
+
+    fn canonicalize(&self) -> Dotfiles {
+        Dotfiles::new(Some(self.get_files()))
     }
 }
 
@@ -103,7 +107,7 @@ pub fn init(config: &PathBuf, target: &PathBuf, force: bool) -> Result<(), Error
     }
     else {
         let target = target.canonicalize()?;
-        println!("Installing a fresh config in {}", config.to_string_lossy());
+        info!("Installing a fresh config in {}", config.to_string_lossy());
         if !config.is_file() || force {
             let contents = toml::to_string(&Config::new(target))?;
             File::create(config)?.write(contents.as_bytes())?;
@@ -120,14 +124,14 @@ pub fn watch(config: PathBuf) -> Result<(), Error> {
     let config = check_config(&config)?;
     let (tx, rx) = channel();
     let mut watcher: RecommendedWatcher = Watcher::new(tx, Duration::from_secs(2))?;
-    println!("Watching file changes in target {}", config.target.to_string_lossy());
+    info!("Watching file changes in target {}", config.target.to_string_lossy());
     watcher.watch(config.target.clone(), RecursiveMode::Recursive)?;
     loop {
         let event = rx.recv()?;
         match event {
             DebouncedEvent::Create(created) => {
                 let relative = relative_to(config.target.as_path(), created.as_path());
-                println!("File created: {}", relative.to_string_lossy())
+                info!("File created: {}", relative.to_string_lossy())
             },
             _ => {}
         }
@@ -144,7 +148,6 @@ pub fn check(config: PathBuf, thorough: bool) -> Result<(), Error> {
 
 #[cfg(test)]
 mod tests {
-
     use commands::*;
     use std::fs;
     use tempdir::TempDir;
@@ -168,5 +171,4 @@ mod tests {
         let dotfiles = load_dotfiles(&config).unwrap();
         assert_eq!(dotfiles, Dotfiles::new(Some(vec![])));
     }
-
 }
