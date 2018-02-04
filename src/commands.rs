@@ -3,7 +3,7 @@ use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use std::fmt;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc::channel;
 use std::time::Duration;
 use std::vec::Vec;
@@ -54,6 +54,18 @@ impl Dotfiles {
 
     fn canonicalize(&self) -> Dotfiles {
         Dotfiles::new(Some(self.get_files()))
+    }
+
+    fn get_absent_files(&self, contents: &Path) -> Vec<PathBuf> {
+        self.get_files().iter().filter_map(|dotfile| {
+            let expected = contents.join(dotfile);
+            if expected.exists() {
+                None
+            }
+            else {
+                Some(dotfile.clone())
+            }
+        }).collect()
     }
 }
 
@@ -141,6 +153,17 @@ pub fn watch(config: PathBuf) -> Result<(), Error> {
 pub fn check(config: PathBuf, thorough: bool) -> Result<(), Error> {
     let config = check_config(&config)?;
     let dotfiles = load_dotfiles(&config)?;
+
+    info!("Checking for absent content in {}", config.contents().to_string_lossy());
+    let absent_contents = dotfiles.get_absent_files(config.contents().as_path());
+    if absent_contents.is_empty() {
+        info!("No absent content.")
+    }
+    else {
+        let msg = format!("Absent content: {:?}", absent_contents.iter().map(|path| { path.to_string_lossy() }).collect::<Vec<_>>());
+        let err = DotfilesError::new(msg);
+        Err(err)?
+    }
 
     save_dotfiles(&config, dotfiles)?;
     Ok(())
