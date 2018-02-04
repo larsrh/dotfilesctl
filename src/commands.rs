@@ -21,17 +21,11 @@ impl Config {
     }
 
     fn dotfiles(&self) -> PathBuf {
-        let mut buf = PathBuf::new();
-        buf.push(self.target.clone());
-        buf.push("dotfiles.toml");
-        buf
+        self.target.join("dotfiles.toml")
     }
 
     fn contents(&self) -> PathBuf {
-        let mut buf = PathBuf::new();
-        buf.push(self.target.clone());
-        buf.push("contents");
-        buf
+        self.target.join("contents")
     }
 }
 
@@ -114,19 +108,20 @@ fn save_dotfiles(config: &Config, dotfiles: Dotfiles) -> Result<(), Error> {
 
 pub fn init(config: &PathBuf, target: &PathBuf, force: bool) -> Result<(), Error> {
     if !target.is_dir() {
-        let err = DotfilesError::new(format!("{} is not a directory", target.to_string_lossy()));
+        let err = DotfilesError::new(format!("{:?} is not a directory", target));
         Err(err)?
     }
     else {
         let target = target.canonicalize()?;
-        info!("Installing a fresh config in {}", config.to_string_lossy());
+        info!("Installing a fresh config in {:?}", config);
         if !config.is_file() || force {
             let contents = toml::to_string(&Config::new(target))?;
             File::create(config)?.write(contents.as_bytes())?;
             Ok(())
         }
         else {
-            let err = DotfilesError::new(format!("{} exists but --force has not been specified", config.to_string_lossy()));
+            let msg = format!("{:?} exists but --force has not been specified", config);
+            let err = DotfilesError::new(msg);
             Err(err)?
         }
     }
@@ -136,14 +131,14 @@ pub fn watch(config: PathBuf) -> Result<(), Error> {
     let config = check_config(&config)?;
     let (tx, rx) = channel();
     let mut watcher: RecommendedWatcher = Watcher::new(tx, Duration::from_secs(2))?;
-    info!("Watching file changes in target {}", config.target.to_string_lossy());
+    info!("Watching file changes in target {:?}", config.target);
     watcher.watch(config.target.clone(), RecursiveMode::Recursive)?;
     loop {
         let event = rx.recv()?;
         match event {
             DebouncedEvent::Create(created) => {
                 let relative = relative_to(config.target.as_path(), created.as_path());
-                info!("File created: {}", relative.to_string_lossy())
+                info!("File created: {:?}", relative)
             },
             _ => {}
         }
@@ -154,13 +149,13 @@ pub fn check(config: PathBuf, thorough: bool) -> Result<(), Error> {
     let config = check_config(&config)?;
     let dotfiles = load_dotfiles(&config)?;
 
-    info!("Checking for absent content in {}", config.contents().to_string_lossy());
+    info!("Checking for absent content in {:?}", config.contents());
     let absent_contents = dotfiles.get_absent_files(config.contents().as_path());
     if absent_contents.is_empty() {
         info!("No absent content.")
     }
     else {
-        let msg = format!("Absent content: {:?}", absent_contents.iter().map(|path| { path.to_string_lossy() }).collect::<Vec<_>>());
+        let msg = format!("Absent content: {:?}", absent_contents);
         let err = DotfilesError::new(msg);
         Err(err)?
     }
