@@ -62,5 +62,8 @@ fn main() {
             Ok(println!("{}", matches.usage()))
     };
 
-    result.unwrap();
+    match result {
+        Ok(()) => (),
+        Err(err) => println!("{}", err)
+    }
 }
