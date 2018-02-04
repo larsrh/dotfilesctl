@@ -3,6 +3,7 @@
 extern crate notify;
 #[macro_use] extern crate proptest;
 #[macro_use] extern crate serde_derive;
+extern crate tempdir;
 extern crate toml;
 extern crate xdg;
 
@@ -30,6 +31,13 @@ fn main() {
     let watch_command =
         SubCommand::with_name("watch");
 
+    let check_command =
+        SubCommand::with_name("check")
+            .arg(Arg::with_name("thorough")
+                .short("t")
+                .long("throrough")
+                .help("Throrough check: scan dotfiles in home directory for dangling symlinks"));
+
     let xdg_dirs = xdg::BaseDirectories::with_prefix(APP_NAME).unwrap();
 
     let matches =
@@ -44,6 +52,7 @@ fn main() {
                     .takes_value(true))
             .subcommand(init_command)
             .subcommand(watch_command)
+            .subcommand(check_command)
             .get_matches();
 
     let config = matches.value_of("config").map(PathBuf::from).unwrap_or_else(|| {
@@ -53,11 +62,16 @@ fn main() {
     let result = match matches.subcommand() {
         ("init", Some(matches)) =>
             commands::init(
-                config,
-                PathBuf::from(matches.value_of("dir").unwrap()),
+                &config,
+                &PathBuf::from(matches.value_of("dir").unwrap()),
                 matches.is_present("force")),
         ("watch", Some(_)) =>
             commands::watch(config),
+        ("check", Some(matches)) =>
+            commands::check(
+                config,
+                matches.is_present("thorough")
+            ),
         _ =>
             Ok(println!("{}", matches.usage()))
     };
