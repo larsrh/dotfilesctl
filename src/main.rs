@@ -31,7 +31,12 @@ fn main() {
                 .short("f")
                 .long("force")
                 .help("Overwrite existing configuration file"))
-            .arg(Arg::with_name("dir")
+            .arg(Arg::with_name("home")
+                .short("h")
+                .long("home")
+                .help("Specify home directory (default: auto-detected)")
+                .takes_value(true))
+            .arg(Arg::with_name("target")
                 .value_name("DIR")
                 .help("Directory to scan for dotfiles")
                 .required(true));
@@ -44,7 +49,11 @@ fn main() {
             .arg(Arg::with_name("thorough")
                 .short("t")
                 .long("throrough")
-                .help("Throrough check: scan dotfiles in home directory for dangling symlinks"));
+                .help("Throrough check: scan dotfiles in home directory for dangling symlinks"))
+            .arg(Arg::with_name("repair")
+                .short("r")
+                .long("repair")
+                .help("Repair broken files"));
 
     let xdg_dirs = xdg::BaseDirectories::with_prefix(APP_NAME).unwrap();
 
@@ -72,13 +81,15 @@ fn main() {
             commands::init(
                 &config,
                 &PathBuf::from(matches.value_of("dir").unwrap()),
+                matches.value_of("home").map(PathBuf::from),
                 matches.is_present("force")),
         ("watch", Some(_)) =>
             commands::watch(config),
         ("check", Some(matches)) =>
             commands::check(
                 config,
-                matches.is_present("thorough")
+                matches.is_present("thorough"),
+                matches.is_present("repair")
             ),
         _ =>
             Ok(println!("{}", matches.usage()))

@@ -12,14 +12,43 @@ use std::vec::Vec;
 use paths::*;
 use toml;
 
+#[derive(Debug, Fail)]
+struct DotfilesError {
+    description: String
+}
+
+impl fmt::Display for DotfilesError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // Use `self.number` to refer to each positional data point.
+        write!(f, "{}", self.description)
+    }
+}
+
+impl DotfilesError {
+    fn new(description: String) -> DotfilesError {
+        DotfilesError { description }
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 struct Config {
-    target: PathBuf
+    target: PathBuf,
+    home: Option<PathBuf>
 }
 
 impl Config {
-    fn new(target: PathBuf) -> Config {
-        Config { target }
+    fn new(target: PathBuf, home: Option<PathBuf>) -> Config {
+        Config { target, home }
+    }
+
+    fn get_home(&self) -> Result<PathBuf, DotfilesError> {
+        match self.home.clone().or(env::home_dir()) {
+            Some(home) => Ok(home),
+            None => {
+                let msg = format!("No home directory configured and none could be detected");
+                Err(DotfilesError::new(msg))
+            }
+        }
     }
 
     fn dotfiles(&self) -> PathBuf {
@@ -45,6 +74,25 @@ struct Symlink {
 impl Symlink {
     fn new(expected: PathBuf, status: SymlinkStatus) -> Symlink {
         Symlink { expected, status }
+    }
+
+    fn get(contents: &Path, home: &Path, dotfile: &PathBuf) -> Symlink {
+        let expected = contents.join(dotfile);
+        let symlink = home.join(dotfile);
+        match symlink.symlink_metadata() {
+            Ok(_) =>
+                match symlink.read_link() {
+                    Ok(actual) =>
+                        Symlink::new(
+                            expected.clone(),
+                            if expected == actual { SymlinkStatus::Ok } else { SymlinkStatus::Wrong }
+                        ),
+                    Err(_) =>
+                        Symlink::new(expected, SymlinkStatus::Wrong)
+                },
+            Err(err) =>
+                Symlink::new(expected, SymlinkStatus::Absent(Error::from(err)))
+        }
     }
 }
 
@@ -83,42 +131,8 @@ impl Dotfiles {
 
     fn get_symlinks(&self, contents: &Path, home: &Path) -> HashMap<PathBuf, Symlink> {
         self.get_files().iter().map(|dotfile| {
-            let expected = contents.join(dotfile);
-            let symlink = home.join(dotfile);
-            let result = match symlink.symlink_metadata() {
-                Ok(_) =>
-                    match symlink.read_link() {
-                        Ok(actual) =>
-                            Symlink::new(
-                                expected.clone(),
-                                if expected == actual { SymlinkStatus::Ok } else { SymlinkStatus::Wrong }
-                            ),
-                        Err(_) =>
-                            Symlink::new(expected, SymlinkStatus::Wrong)
-                    },
-                Err(err) =>
-                    Symlink::new(expected, SymlinkStatus::Absent(Error::from(err)))
-            };
-            (dotfile.clone(), result)
+            (dotfile.clone(), Symlink::get(contents, home, dotfile))
         }).collect()
-    }
-}
-
-#[derive(Debug, Fail)]
-struct DotfilesError {
-    description: String
-}
-
-impl fmt::Display for DotfilesError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // Use `self.number` to refer to each positional data point.
-        write!(f, "{}", self.description)
-    }
-}
-
-impl DotfilesError {
-    fn new(description: String) -> DotfilesError {
-        DotfilesError { description }
     }
 }
 
@@ -147,7 +161,7 @@ fn save_dotfiles(config: &Config, dotfiles: Dotfiles) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn init(config: &PathBuf, target: &PathBuf, force: bool) -> Result<(), Error> {
+pub fn init(config: &PathBuf, target: &PathBuf, home: Option<PathBuf>, force: bool) -> Result<(), Error> {
     if !target.is_dir() {
         let err = DotfilesError::new(format!("{:?} is not a directory", target));
         Err(err)?
@@ -156,7 +170,7 @@ pub fn init(config: &PathBuf, target: &PathBuf, force: bool) -> Result<(), Error
         let target = target.canonicalize()?;
         info!("Installing a fresh config in {:?}", config);
         if !config.is_file() || force {
-            let contents = toml::to_string(&Config::new(target))?;
+            let contents = toml::to_string(&Config::new(target, home))?;
             File::create(config)?.write(contents.as_bytes())?;
             Ok(())
         }
@@ -186,7 +200,8 @@ pub fn watch(config: PathBuf) -> Result<(), Error> {
     }
 }
 
-pub fn check(config: PathBuf, thorough: bool) -> Result<(), Error> {
+// TODO implement thorough checking
+pub fn check(config: PathBuf, _thorough: bool, repair: bool) -> Result<(), Error> {
     let config = check_config(&config)?;
     let dotfiles = load_dotfiles(&config)?;
 
@@ -196,12 +211,15 @@ pub fn check(config: PathBuf, thorough: bool) -> Result<(), Error> {
         info!("No absent content.")
     }
     else {
+        if repair {
+            warn!("Cannot fix absent content.");
+        }
         let msg = format!("Absent content: {:?}", absent_contents);
         let err = DotfilesError::new(msg);
         Err(err)?
     }
 
-    let home = env::home_dir().unwrap();
+    let home = config.get_home()?;
     info!("Checking for symlinks in {:?}", home);
     let symlinks = dotfiles.get_symlinks(config.contents().as_path(), home.as_path());
     for (dotfile, symlink) in &symlinks {
@@ -228,16 +246,20 @@ pub fn check(config: PathBuf, thorough: bool) -> Result<(), Error> {
 mod tests {
     use commands::*;
     use std::fs;
+    use std::os::unix::fs as unix;
     use tempdir::TempDir;
 
     fn setup_config() -> (TempDir, Config) {
         let dir = TempDir::new("dotfilesctl_test").unwrap();
+        let home = dir.path().join("home");
+        fs::create_dir(&home).unwrap();
         let target = dir.path().join("target");
         fs::create_dir(&target).unwrap();
         let config = dir.path().join("config.toml");
-        init(&config, &target, false).unwrap();
+        init(&config, &target, Some(home),false).unwrap();
         let config = check_config(&config).unwrap();
         assert_eq!(target, config.target);
+        fs::create_dir(config.contents()).unwrap();
         (dir, config)
     }
 
@@ -248,5 +270,20 @@ mod tests {
         save_dotfiles(&config, dotfiles).unwrap();
         let dotfiles = load_dotfiles(&config).unwrap();
         assert_eq!(dotfiles, Dotfiles::new(Some(vec![])));
+    }
+
+    #[test]
+    fn test_check_success() {
+        let (dir, config) = setup_config();
+        let files = vec![".test1", ".test2"];
+        for f in &files {
+            let path = config.contents().join(f);
+            let msg = format!("{:?} can be created", path);
+            File::create(path).expect(msg.as_ref());
+            unix::symlink(config.contents().join(f), config.get_home().unwrap().join(f)).unwrap();
+        }
+        let dotfiles = Dotfiles::new(Some(files.iter().map(PathBuf::from).collect()));
+        save_dotfiles(&config, dotfiles).unwrap();
+        check(dir.path().join("config.toml"), false, false).unwrap();
     }
 }
