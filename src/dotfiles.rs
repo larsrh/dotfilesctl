@@ -1,8 +1,10 @@
 use config::*;
 use failure::Error;
 use std::collections::HashMap;
-use std::fs::{OpenOptions};
+use std::fs;
+use std::fs::OpenOptions;
 use std::io::{Read, Write};
+use std::os::unix::fs as unix;
 use std::path::{Path, PathBuf};
 use std::vec::Vec;
 use toml;
@@ -16,12 +18,13 @@ pub enum SymlinkStatus {
 
 pub struct Symlink {
     pub expected: PathBuf,
+    pub path: PathBuf,
     pub status: SymlinkStatus
 }
 
 impl Symlink {
-    pub fn new(expected: PathBuf, status: SymlinkStatus) -> Symlink {
-        Symlink { expected, status }
+    fn new(expected: PathBuf, path: PathBuf, status: SymlinkStatus) -> Symlink {
+        Symlink { expected, path, status }
     }
 
     pub fn get(contents: &Path, home: &Path, dotfile: &PathBuf) -> Symlink {
@@ -33,14 +36,35 @@ impl Symlink {
                     Ok(actual) =>
                         Symlink::new(
                             expected.clone(),
+                            symlink,
                             if expected == actual { SymlinkStatus::Ok } else { SymlinkStatus::Wrong }
                         ),
                     Err(_) =>
-                        Symlink::new(expected, SymlinkStatus::Wrong)
+                        Symlink::new(expected, symlink, SymlinkStatus::Wrong)
                 },
             Err(err) =>
-                Symlink::new(expected, SymlinkStatus::Absent(Error::from(err)))
+                Symlink::new(expected, symlink, SymlinkStatus::Absent(Error::from(err)))
         }
+    }
+
+    pub fn create(&self) -> Result<(), Error> {
+        info!("Creating symlink {:?}", self.expected);
+        unix::symlink(self.expected.clone(), self.path.clone())?;
+        Ok(())
+    }
+
+    pub fn repair(&self) -> Result<(), Error> {
+        match self.status {
+            SymlinkStatus::Wrong => {
+                info!("Deleting file {:?}", self.path);
+                fs::remove_file(self.path.clone())?;
+                self.create()?
+            },
+            SymlinkStatus::Absent(_) => self.create()?,
+            SymlinkStatus::Ok => ()
+        }
+
+        Ok(())
     }
 }
 
@@ -102,20 +126,17 @@ impl Dotfiles {
     }
 
     // TODO implement thorough checking
-    pub fn check(&self, config: &Config, _thorough: bool, repair: bool) -> Result<(), Error> {
+    pub fn check(&self, config: &Config, _thorough: bool) -> Result<(), Error> {
         info!("Checking for absent content in {:?}", config.contents());
         let absent_contents = self.get_absent_files(config.contents().as_path());
         if absent_contents.is_empty() {
             info!("No absent content.")
         }
-            else {
-                if repair {
-                    warn!("Cannot fix absent content.");
-                }
-                let msg = format!("Absent content: {:?}", absent_contents);
-                let err = DotfilesError::new(msg);
-                Err(err)?
-            }
+        else {
+            let msg = format!("Absent content: {:?}", absent_contents);
+            let err = DotfilesError::new(msg);
+            Err(err)?
+        }
 
         let home = config.get_home()?;
         info!("Checking for symlinks in {:?}", home);
@@ -123,7 +144,7 @@ impl Dotfiles {
         for (dotfile, symlink) in &symlinks {
             match symlink.status {
                 SymlinkStatus::Wrong => {
-                    let msg = format!("{:?} is not a symbolic link or symbolic link with wrong target, expected: {:?}", dotfile, symlink.expected);
+                    let msg = format!("{:?} is not a symlink or symlink with wrong target, expected: {:?}", dotfile, symlink.expected);
                     let err = DotfilesError::new(msg);
                     Err(err)?
                 },
@@ -134,7 +155,19 @@ impl Dotfiles {
                 SymlinkStatus::Ok => ()
             }
         }
-        info!("{} symlinks correct.", symlinks.len());
+        info!("{} symlink(s) correct.", symlinks.len());
+
+        Ok(())
+    }
+
+    pub fn repair(&self, config: &Config) -> Result<(), Error> {
+        let home = config.get_home()?;
+        info!("Attempting to repair broken symlinks in {:?}", home);
+
+        let symlinks = self.get_symlinks(config.contents().as_path(), home.as_path());
+        for (_, symlink) in &symlinks {
+            symlink.repair()?;
+        }
 
         Ok(())
     }
@@ -156,18 +189,36 @@ mod tests {
         assert_eq!(dotfiles, Dotfiles::new(Some(vec![])));
     }
 
+    fn setup_content(config: &Config, file: &str) {
+        let path = config.contents().join(file);
+        let msg = format!("{:?} can be created", path);
+        File::create(path).expect(msg.as_ref());
+    }
+
+    fn setup_symlink(config: &Config, file: &str) {
+        let src = config.contents().join(file);
+        let dst = config.get_home().expect("home").join(file);
+        let msg = format!("{:?} can be created", dst);
+        unix::symlink(src, dst).expect(msg.as_ref());
+    }
+
+    fn setup_symlink_wrong(config: &Config, file: &str) {
+        let path = config.get_home().expect("home").join(file);
+        let msg = format!("{:?} can be created", path);
+        File::create(path).expect(msg.as_ref());
+    }
+
+    // TODO refactor
     #[test]
     fn test_check_success() {
         let (_dir, config) = setup_config();
         let files = vec![".test1", ".test2"];
         for f in &files {
-            let path = config.contents().join(f);
-            let msg = format!("{:?} can be created", path);
-            File::create(path).expect(msg.as_ref());
-            unix::symlink(config.contents().join(f), config.get_home().unwrap().join(f)).unwrap();
+            setup_content(&config, f);
+            setup_symlink(&config, f);
         }
         let dotfiles = Dotfiles::new(Some(files.iter().map(PathBuf::from).collect()));
-        dotfiles.check(&config,false, false).unwrap();
+        dotfiles.check(&config,false).unwrap();
     }
 
     #[test]
@@ -175,19 +226,37 @@ mod tests {
     fn test_check_failure_missing() {
         let (_dir, config) = setup_config();
         let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(".test")]));
-        dotfiles.check(&config, false, false).unwrap();
+        dotfiles.check(&config, false).unwrap();
     }
 
     #[test]
     #[should_panic(expected = "expected symbolic link to")]
     fn test_check_failure_symlink() {
         let (_dir, config) = setup_config();
-        let file = PathBuf::from(".test");
-        let path = config.contents().join(file.clone());
-        let msg = format!("{:?} can be created", path);
-        File::create(path).expect(msg.as_ref());
+        let file = ".test";
+        setup_content(&config, file);
+        let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]));
+        dotfiles.check(&config, false).unwrap();
+    }
 
-        let dotfiles = Dotfiles::new(Some(vec![file]));
-        dotfiles.check(&config, false, false).unwrap();
+    #[test]
+    fn test_repair_absent() {
+        let (_dir, config) = setup_config();
+        let file = ".test";
+        setup_content(&config, file);
+        let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]));
+        dotfiles.repair(&config).unwrap();
+        dotfiles.check(&config, false).unwrap();
+    }
+
+    #[test]
+    fn test_repair_wrong() {
+        let (_dir, config) = setup_config();
+        let file = ".test";
+        setup_content(&config, file);
+        setup_symlink_wrong(&config, file);
+        let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]));
+        dotfiles.repair(&config).unwrap();
+        dotfiles.check(&config, false).unwrap();
     }
 }
