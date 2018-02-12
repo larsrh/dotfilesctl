@@ -81,24 +81,24 @@ impl Dotfiles {
             (dotfile.clone(), Symlink::get(contents, home, dotfile))
         }).collect()
     }
-}
 
-pub fn load_dotfiles(config: &Config) -> Result<Dotfiles, Error> {
-    let mut contents = String::new();
-    OpenOptions::new()
-        .write(true).read(true).create(true)
-        .open(config.dotfiles())?
-        .read_to_string(&mut contents)?;
-    let dotfiles = toml::from_str::<Dotfiles>(contents.as_ref())?;
-    Ok(dotfiles)
-}
+    pub fn load(config: &Config) -> Result<Dotfiles, Error> {
+        let mut contents = String::new();
+        OpenOptions::new()
+            .write(true).read(true).create(true)
+            .open(config.dotfiles())?
+            .read_to_string(&mut contents)?;
+        let dotfiles = toml::from_str::<Dotfiles>(contents.as_ref())?;
+        Ok(dotfiles)
+    }
 
-pub fn save_dotfiles(config: &Config, dotfiles: Dotfiles) -> Result<(), Error> {
-    let contents = toml::to_string(&dotfiles.canonicalize())?;
-    OpenOptions::new()
-        .truncate(true).write(true).create(true)
-        .open(config.dotfiles())?.write(contents.as_bytes())?;
-    Ok(())
+    pub fn save(&self, config: &Config) -> Result<(), Error> {
+        let contents = toml::to_string(&self.canonicalize())?;
+        OpenOptions::new()
+            .truncate(true).write(true).create(true)
+            .open(config.dotfiles())?.write(contents.as_bytes())?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -109,9 +109,9 @@ mod tests {
     #[test]
     fn test_empty_dotfiles() {
         let (_dir, config) = setup_config();
-        let dotfiles = load_dotfiles(&config).unwrap();
-        save_dotfiles(&config, dotfiles).unwrap();
-        let dotfiles = load_dotfiles(&config).unwrap();
+        let dotfiles = Dotfiles::load(&config).unwrap();
+        dotfiles.save(&config).unwrap();
+        let dotfiles = Dotfiles::load(&config).unwrap();
         assert_eq!(dotfiles, Dotfiles::new(Some(vec![])));
     }
 }

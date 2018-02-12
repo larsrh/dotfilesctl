@@ -32,7 +32,7 @@ pub fn watch(config: PathBuf) -> Result<(), Error> {
 // TODO implement thorough checking
 pub fn check(config: PathBuf, _thorough: bool, repair: bool) -> Result<(), Error> {
     let config = check_config(&config)?;
-    let dotfiles = load_dotfiles(&config)?;
+    let dotfiles = Dotfiles::load(&config)?;
 
     info!("Checking for absent content in {:?}", config.contents());
     let absent_contents = dotfiles.get_absent_files(config.contents().as_path());
@@ -67,7 +67,7 @@ pub fn check(config: PathBuf, _thorough: bool, repair: bool) -> Result<(), Error
     }
     info!("{} symlinks correct.", symlinks.len());
 
-    save_dotfiles(&config, dotfiles)?;
+    dotfiles.save(&config)?;
     Ok(())
 }
 
@@ -88,7 +88,7 @@ mod tests {
             unix::symlink(config.contents().join(f), config.get_home().unwrap().join(f)).unwrap();
         }
         let dotfiles = Dotfiles::new(Some(files.iter().map(PathBuf::from).collect()));
-        save_dotfiles(&config, dotfiles).unwrap();
+        dotfiles.save(&config).unwrap();
         check(dir.path().join("config.toml"), false, false).unwrap();
     }
 }
