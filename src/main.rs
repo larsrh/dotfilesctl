@@ -12,6 +12,7 @@ extern crate xdg;
 
 mod config;
 mod commands;
+mod dotfiles;
 mod paths;
 mod util;
 

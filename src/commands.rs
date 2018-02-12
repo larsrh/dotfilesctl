@@ -1,112 +1,15 @@
 use config::*;
+use dotfiles::*;
 use failure::Error;
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
-use std::collections::HashMap;
-use std::fs::{File, OpenOptions};
-use std::io::{Read, Write};
-use std::path::{Path, PathBuf};
+use std::fs::File;
+use std::path::PathBuf;
 use std::sync::mpsc::channel;
 use std::time::Duration;
-use std::vec::Vec;
 use paths::*;
-use toml;
 use util::DotfilesError;
 
 pub use config::init as init;
-
-enum SymlinkStatus {
-    Ok,
-    Absent(Error),
-    Wrong
-}
-
-struct Symlink {
-    expected: PathBuf,
-    status: SymlinkStatus
-}
-
-impl Symlink {
-    fn new(expected: PathBuf, status: SymlinkStatus) -> Symlink {
-        Symlink { expected, status }
-    }
-
-    fn get(contents: &Path, home: &Path, dotfile: &PathBuf) -> Symlink {
-        let expected = contents.join(dotfile);
-        let symlink = home.join(dotfile);
-        match symlink.symlink_metadata() {
-            Ok(_) =>
-                match symlink.read_link() {
-                    Ok(actual) =>
-                        Symlink::new(
-                            expected.clone(),
-                            if expected == actual { SymlinkStatus::Ok } else { SymlinkStatus::Wrong }
-                        ),
-                    Err(_) =>
-                        Symlink::new(expected, SymlinkStatus::Wrong)
-                },
-            Err(err) =>
-                Symlink::new(expected, SymlinkStatus::Absent(Error::from(err)))
-        }
-    }
-}
-
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
-struct Dotfiles {
-    files: Option<Vec<PathBuf>>
-}
-
-impl Dotfiles {
-    fn new(files: Option<Vec<PathBuf>>) -> Dotfiles {
-        Dotfiles { files }
-    }
-
-    fn get_files(&self) -> Vec<PathBuf> {
-        match self.files {
-            Some(ref files) => files.clone(),
-            None => vec![]
-        }
-    }
-
-    fn canonicalize(&self) -> Dotfiles {
-        Dotfiles::new(Some(self.get_files()))
-    }
-
-    fn get_absent_files(&self, contents: &Path) -> Vec<PathBuf> {
-        self.get_files().iter().filter_map(|dotfile| {
-            let expected = contents.join(dotfile);
-            if expected.exists() {
-                None
-            }
-            else {
-                Some(dotfile.clone())
-            }
-        }).collect()
-    }
-
-    fn get_symlinks(&self, contents: &Path, home: &Path) -> HashMap<PathBuf, Symlink> {
-        self.get_files().iter().map(|dotfile| {
-            (dotfile.clone(), Symlink::get(contents, home, dotfile))
-        }).collect()
-    }
-}
-
-fn load_dotfiles(config: &Config) -> Result<Dotfiles, Error> {
-    let mut contents = String::new();
-    OpenOptions::new()
-        .write(true).read(true).create(true)
-        .open(config.dotfiles())?
-        .read_to_string(&mut contents)?;
-    let dotfiles = toml::from_str::<Dotfiles>(contents.as_ref())?;
-    Ok(dotfiles)
-}
-
-fn save_dotfiles(config: &Config, dotfiles: Dotfiles) -> Result<(), Error> {
-    let contents = toml::to_string(&dotfiles.canonicalize())?;
-    OpenOptions::new()
-        .truncate(true).write(true).create(true)
-        .open(config.dotfiles())?.write(contents.as_bytes())?;
-    Ok(())
-}
 
 pub fn watch(config: PathBuf) -> Result<(), Error> {
     let config = check_config(&config)?;
@@ -173,15 +76,6 @@ mod tests {
     use commands::*;
     use config::test_util::*;
     use std::os::unix::fs as unix;
-
-    #[test]
-    fn test_empty_dotfiles() {
-        let (_dir, config) = setup_config();
-        let dotfiles = load_dotfiles(&config).unwrap();
-        save_dotfiles(&config, dotfiles).unwrap();
-        let dotfiles = load_dotfiles(&config).unwrap();
-        assert_eq!(dotfiles, Dotfiles::new(Some(vec![])));
-    }
 
     #[test]
     fn test_check_success() {
