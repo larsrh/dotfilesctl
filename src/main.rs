@@ -12,6 +12,7 @@ extern crate xdg;
 
 mod commands;
 mod paths;
+mod util;
 
 use clap::{Arg, App, SubCommand};
 use log::LevelFilter;

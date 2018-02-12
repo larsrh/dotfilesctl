@@ -2,7 +2,6 @@ use failure::Error;
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use std::collections::HashMap;
 use std::env;
-use std::fmt;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -11,24 +10,7 @@ use std::time::Duration;
 use std::vec::Vec;
 use paths::*;
 use toml;
-
-#[derive(Debug, Fail)]
-struct DotfilesError {
-    description: String
-}
-
-impl fmt::Display for DotfilesError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // Use `self.number` to refer to each positional data point.
-        write!(f, "{}", self.description)
-    }
-}
-
-impl DotfilesError {
-    fn new(description: String) -> DotfilesError {
-        DotfilesError { description }
-    }
-}
+use util::DotfilesError;
 
 #[derive(Debug, Deserialize, Serialize)]
 struct Config {
