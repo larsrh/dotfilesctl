@@ -125,8 +125,7 @@ impl Dotfiles {
         Ok(())
     }
 
-    // TODO implement thorough checking
-    pub fn check(&self, config: &Config, _thorough: bool) -> Result<(), Error> {
+    pub fn check(&self, config: &Config) -> Result<(), Error> {
         info!("Checking for absent content in {:?}", config.contents());
         let absent_contents = self.get_absent_files(config.contents().as_path());
         if absent_contents.is_empty() {
@@ -218,7 +217,7 @@ mod tests {
             setup_symlink(&config, f);
         }
         let dotfiles = Dotfiles::new(Some(files.iter().map(PathBuf::from).collect()));
-        dotfiles.check(&config,false).unwrap();
+        dotfiles.check(&config).unwrap();
     }
 
     #[test]
@@ -226,7 +225,7 @@ mod tests {
     fn test_check_failure_missing() {
         let (_dir, config) = setup_config();
         let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(".test")]));
-        dotfiles.check(&config, false).unwrap();
+        dotfiles.check(&config).unwrap();
     }
 
     #[test]
@@ -236,7 +235,7 @@ mod tests {
         let file = ".test";
         setup_content(&config, file);
         let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]));
-        dotfiles.check(&config, false).unwrap();
+        dotfiles.check(&config).unwrap();
     }
 
     #[test]
@@ -246,7 +245,7 @@ mod tests {
         setup_content(&config, file);
         let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]));
         dotfiles.repair(&config).unwrap();
-        dotfiles.check(&config, false).unwrap();
+        dotfiles.check(&config).unwrap();
     }
 
     #[test]
@@ -257,6 +256,6 @@ mod tests {
         setup_symlink_wrong(&config, file);
         let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]));
         dotfiles.repair(&config).unwrap();
-        dotfiles.check(&config, false).unwrap();
+        dotfiles.check(&config).unwrap();
     }
 }

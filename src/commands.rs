@@ -27,11 +27,12 @@ pub fn watch(config: PathBuf) -> Result<(), Error> {
     }
 }
 
-pub fn check(config: PathBuf, thorough: bool, repair: bool) -> Result<(), Error> {
+// TODO implement thorough checking
+pub fn check(config: PathBuf, _thorough: bool, repair: bool) -> Result<(), Error> {
     let config = check_config(&config)?;
     let dotfiles = Dotfiles::load(&config)?;
 
-    match dotfiles.check(&config, thorough) {
+    match dotfiles.check(&config) {
         Ok(()) =>
             info!("Checking successful!"),
         Err(err) =>
@@ -41,7 +42,7 @@ pub fn check(config: PathBuf, thorough: bool, repair: bool) -> Result<(), Error>
                 info!("Attempting to repair problems");
                 dotfiles.repair(&config)?;
                 info!("Rechecking");
-                dotfiles.check(&config, thorough)?;
+                dotfiles.check(&config)?;
             }
             else {
                 Err(err)?
