@@ -167,7 +167,27 @@ mod tests {
             unix::symlink(config.contents().join(f), config.get_home().unwrap().join(f)).unwrap();
         }
         let dotfiles = Dotfiles::new(Some(files.iter().map(PathBuf::from).collect()));
-        dotfiles.save(&config).unwrap();
         dotfiles.check(&config,false, false).unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "Absent content")]
+    fn test_check_failure_missing() {
+        let (_dir, config) = setup_config();
+        let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(".test")]));
+        dotfiles.check(&config, false, false).unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "expected symbolic link to")]
+    fn test_check_failure_symlink() {
+        let (_dir, config) = setup_config();
+        let file = PathBuf::from(".test");
+        let path = config.contents().join(file.clone());
+        let msg = format!("{:?} can be created", path);
+        File::create(path).expect(msg.as_ref());
+
+        let dotfiles = Dotfiles::new(Some(vec![file]));
+        dotfiles.check(&config, false, false).unwrap();
     }
 }
