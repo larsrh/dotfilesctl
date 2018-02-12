@@ -1,7 +1,7 @@
+use config::*;
 use failure::Error;
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use std::collections::HashMap;
-use std::env;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -12,35 +12,7 @@ use paths::*;
 use toml;
 use util::DotfilesError;
 
-#[derive(Debug, Deserialize, Serialize)]
-struct Config {
-    target: PathBuf,
-    home: Option<PathBuf>
-}
-
-impl Config {
-    fn new(target: PathBuf, home: Option<PathBuf>) -> Config {
-        Config { target, home }
-    }
-
-    fn get_home(&self) -> Result<PathBuf, DotfilesError> {
-        match self.home.clone().or(env::home_dir()) {
-            Some(home) => Ok(home),
-            None => {
-                let msg = format!("No home directory configured and none could be detected");
-                Err(DotfilesError::new(msg))
-            }
-        }
-    }
-
-    fn dotfiles(&self) -> PathBuf {
-        self.target.join("dotfiles.toml")
-    }
-
-    fn contents(&self) -> PathBuf {
-        self.target.join("contents")
-    }
-}
+pub use config::init as init;
 
 enum SymlinkStatus {
     Ok,
@@ -118,13 +90,6 @@ impl Dotfiles {
     }
 }
 
-fn check_config(config: &PathBuf) -> Result<Config, Error> {
-    let mut contents = String::new();
-    File::open(config)?.read_to_string(&mut contents)?;
-    let config = toml::from_str::<Config>(contents.as_ref())?;
-    Ok(config)
-}
-
 fn load_dotfiles(config: &Config) -> Result<Dotfiles, Error> {
     let mut contents = String::new();
     OpenOptions::new()
@@ -141,27 +106,6 @@ fn save_dotfiles(config: &Config, dotfiles: Dotfiles) -> Result<(), Error> {
         .truncate(true).write(true).create(true)
         .open(config.dotfiles())?.write(contents.as_bytes())?;
     Ok(())
-}
-
-pub fn init(config: &PathBuf, target: &PathBuf, home: Option<PathBuf>, force: bool) -> Result<(), Error> {
-    if !target.is_dir() {
-        let err = DotfilesError::new(format!("{:?} is not a directory", target));
-        Err(err)?
-    }
-    else {
-        let target = target.canonicalize()?;
-        info!("Installing a fresh config in {:?}", config);
-        if !config.is_file() || force {
-            let contents = toml::to_string(&Config::new(target, home))?;
-            File::create(config)?.write(contents.as_bytes())?;
-            Ok(())
-        }
-        else {
-            let msg = format!("{:?} exists but --force has not been specified", config);
-            let err = DotfilesError::new(msg);
-            Err(err)?
-        }
-    }
 }
 
 pub fn watch(config: PathBuf) -> Result<(), Error> {
@@ -227,23 +171,8 @@ pub fn check(config: PathBuf, _thorough: bool, repair: bool) -> Result<(), Error
 #[cfg(test)]
 mod tests {
     use commands::*;
-    use std::fs;
+    use config::test_util::*;
     use std::os::unix::fs as unix;
-    use tempdir::TempDir;
-
-    fn setup_config() -> (TempDir, Config) {
-        let dir = TempDir::new("dotfilesctl_test").unwrap();
-        let home = dir.path().join("home");
-        fs::create_dir(&home).unwrap();
-        let target = dir.path().join("target");
-        fs::create_dir(&target).unwrap();
-        let config = dir.path().join("config.toml");
-        init(&config, &target, Some(home),false).unwrap();
-        let config = check_config(&config).unwrap();
-        assert_eq!(target, config.target);
-        fs::create_dir(config.contents()).unwrap();
-        (dir, config)
-    }
 
     #[test]
     fn test_empty_dotfiles() {

@@ -10,6 +10,7 @@ extern crate tempdir;
 extern crate toml;
 extern crate xdg;
 
+mod config;
 mod commands;
 mod paths;
 mod util;
