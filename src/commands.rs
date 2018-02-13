@@ -10,7 +10,7 @@ use paths::*;
 pub use config::init as init;
 
 pub fn watch(config: PathBuf) -> Result<(), Error> {
-    let config = check_config(&config)?;
+    let config = Config::load(&config)?;
     let (tx, rx) = channel();
     let mut watcher: RecommendedWatcher = Watcher::new(tx, Duration::from_secs(2))?;
     info!("Watching file changes in target {:?}", config.target);
@@ -29,7 +29,7 @@ pub fn watch(config: PathBuf) -> Result<(), Error> {
 
 // TODO implement thorough checking
 pub fn check(config: PathBuf, _thorough: bool, repair: bool) -> Result<(), Error> {
-    let config = check_config(&config)?;
+    let config = Config::load(&config)?;
     let dotfiles = Dotfiles::load(&config)?;
 
     match dotfiles.check(&config) {
