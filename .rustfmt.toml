@@ -1,0 +1,2 @@
+control_brace_style = "ClosingNextLine"
+trailing_comma = "Never"
