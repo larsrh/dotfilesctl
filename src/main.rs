@@ -21,7 +21,7 @@ mod dotfiles;
 mod paths;
 mod util;
 
-use clap::{App, Arg, Shell, SubCommand};
+use clap::{App, Shell};
 use log::LevelFilter;
 use std::io;
 use std::path::PathBuf;
@@ -35,69 +35,13 @@ fn main() {
     builder.filter(None, LevelFilter::Debug);
     builder.init();
 
-    let init_command = SubCommand::with_name("init")
-        .arg(
-            Arg::with_name("force")
-                .short("f")
-                .long("force")
-                .help("Overwrite existing configuration file")
-        )
-        .arg(
-            Arg::with_name("home")
-                .short("h")
-                .long("home")
-                .help("Specify home directory (default: auto-detected)")
-                .takes_value(true)
-        )
-        .arg(
-            Arg::with_name("target")
-                .value_name("DIR")
-                .help("Directory to scan for dotfiles")
-                .required(true)
-        );
-
-    let watch_command = SubCommand::with_name("watch");
-
-    let check_command = SubCommand::with_name("check")
-        .arg(
-            Arg::with_name("thorough")
-                .short("t")
-                .long("throrough")
-                .help("Throrough check: scan dotfiles in home directory for dangling symlinks")
-        )
-        .arg(
-            Arg::with_name("repair")
-                .short("r")
-                .long("repair")
-                .help("Repair broken files")
-        );
-
-    let completions_command = SubCommand::with_name("completions")
-        .about("Generates completion scripts for your shell")
-        .arg(
-            Arg::with_name("shell")
-                .value_name("SHELL")
-                .required(true)
-                .possible_values(&["bash", "fish", "zsh"])
-                .help("The shell to generate the script for")
-        );
-
     let xdg_dirs = xdg::BaseDirectories::with_prefix(APP_NAME).unwrap();
 
-    let cli = App::new(APP_NAME)
-        .version(APP_VERSION)
-        .arg(
-            Arg::with_name("config")
-                .short("c")
-                .long("config")
-                .value_name("FILE")
-                .help("Sets a custom config file")
-                .takes_value(true)
-        )
-        .subcommand(init_command)
-        .subcommand(watch_command)
-        .subcommand(check_command)
-        .subcommand(completions_command);
+    let yaml = load_yaml!("../resources/cli.yml");
+
+    let cli = App::from_yaml(yaml)
+        .name(APP_NAME)
+        .version(APP_VERSION);
 
     let matches = cli.clone().get_matches();
 

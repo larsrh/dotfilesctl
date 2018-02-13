@@ -1,0 +1,51 @@
+# name and version need to be present, although we overwrite them later
+# otherwise, clap will not understand this config
+name: dummy
+version: "dummy"
+about: Tiny manager for dotfiles
+args:
+  - config:
+      short: c
+      long: config
+      value_name: FILE
+      help: "Sets a custom config file"
+      takes_value: true
+subcommands:
+  - init:
+      about: "Initialize a configuration"
+      args:
+        - force:
+            short: f
+            long: force
+            help: "Overwrite existing configuration file"
+        - home:
+            short: h
+            long: home
+            value_name: DIR
+            help: "Specify home directory (default: auto-detected)"
+            takes_value: true
+        - target:
+            value_name: DIR
+            help: "Directory to scan for dotfiles"
+            required: true
+  - watch:
+      about: "Watch for changes"
+  - check:
+      about: "Check consistency of dotfiles and symlinks"
+      args:
+        - thorough:
+            short: t
+            long: thorough
+            help: "Throrough check: scan dotfiles in home directory for dangling symlinks"
+        - repair:
+            short: r
+            long: repair
+            help: "Repair broken files"
+  - completions:
+      about: "Generates completion scripts for your shell"
+      args:
+        - shell:
+            value_name: SHELL
+            required: true
+            possible_values: ["bash", "fish", "zsh"]
+            help: "The shell to generate the script for"
