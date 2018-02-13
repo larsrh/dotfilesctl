@@ -7,7 +7,7 @@ extern crate failure;
 extern crate log;
 extern crate notify;
 extern crate pretty_env_logger;
-#[macro_use]
+#[macro_use] #[cfg(test)]
 extern crate proptest;
 #[macro_use]
 extern crate serde_derive;
