@@ -21,9 +21,11 @@ mod dotfiles;
 mod paths;
 mod util;
 
-use clap::{App, Arg, SubCommand};
+use clap::{App, Arg, Shell, SubCommand};
 use log::LevelFilter;
+use std::io;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 static APP_VERSION: &'static str = crate_version!();
 static APP_NAME: &'static str = crate_name!();
@@ -70,9 +72,19 @@ fn main() {
                 .help("Repair broken files")
         );
 
+    let completions_command = SubCommand::with_name("completions")
+        .about("Generates completion scripts for your shell")
+        .arg(
+            Arg::with_name("shell")
+                .value_name("SHELL")
+                .required(true)
+                .possible_values(&["bash", "fish", "zsh"])
+                .help("The shell to generate the script for")
+        );
+
     let xdg_dirs = xdg::BaseDirectories::with_prefix(APP_NAME).unwrap();
 
-    let matches = App::new(APP_NAME)
+    let cli = App::new(APP_NAME)
         .version(APP_VERSION)
         .arg(
             Arg::with_name("config")
@@ -85,7 +97,9 @@ fn main() {
         .subcommand(init_command)
         .subcommand(watch_command)
         .subcommand(check_command)
-        .get_matches();
+        .subcommand(completions_command);
+
+    let matches = cli.clone().get_matches();
 
     let config = matches
         .value_of("config")
@@ -105,6 +119,15 @@ fn main() {
             matches.is_present("thorough"),
             matches.is_present("repair")
         ),
+        ("completions", Some(matches)) => {
+            let shell = matches.value_of("shell").unwrap();
+            cli.clone().gen_completions_to(
+                "dotfilesctl",
+                Shell::from_str(shell).unwrap(),
+                &mut io::stdout()
+            );
+            Ok(())
+        }
         _ => Ok(println!("{}", matches.usage()))
     };
 
