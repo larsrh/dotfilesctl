@@ -9,27 +9,24 @@ use paths::*;
 
 pub use config::init;
 
-pub fn watch(config: PathBuf) -> Result<(), Error> {
-    let config = Config::load(&config)?;
+pub fn watch(config: &PathBuf) -> Result<(), Error> {
+    let config = Config::load(config)?;
     let (tx, rx) = channel();
     let mut watcher: RecommendedWatcher = Watcher::new(tx, Duration::from_secs(2))?;
     info!("Watching file changes in target {:?}", config.target);
     watcher.watch(config.target.clone(), RecursiveMode::Recursive)?;
     loop {
         let event = rx.recv()?;
-        match event {
-            DebouncedEvent::Create(created) => {
-                let relative = relative_to(config.target.as_path(), created.as_path());
-                info!("File created: {:?}", relative)
-            }
-            _ => {}
+        if let DebouncedEvent::Create(created) = event {
+            let relative = relative_to(config.target.as_path(), created.as_path());
+            info!("File created: {:?}", relative)
         }
     }
 }
 
 // TODO implement thorough checking
-pub fn check(config: PathBuf, _thorough: bool, repair: bool) -> Result<(), Error> {
-    let config = Config::load(&config)?;
+pub fn check(config: &PathBuf, _thorough: bool, repair: bool) -> Result<(), Error> {
+    let config = Config::load(config)?;
     let dotfiles = Dotfiles::load(&config)?;
 
     match dotfiles.check(&config) {

@@ -25,11 +25,11 @@ impl Config {
     }
 
     pub fn get_home(&self) -> Result<PathBuf, DotfilesError> {
-        match self.home.clone().or(env::home_dir()) {
+        match self.home.clone().or_else(env::home_dir) {
             Some(home) => Ok(home),
             None => {
-                let msg = format!("No home directory configured and none could be detected");
-                Err(DotfilesError::new(msg))
+                let msg = "No home directory configured and none could be detected";
+                Err(DotfilesError::new(msg.to_string()))
             }
         }
     }
@@ -58,7 +58,7 @@ pub fn init(
         info!("Installing a fresh config in {:?}", config);
         if !config.is_file() || force {
             let contents = toml::to_string(&Config::new(target, home))?;
-            File::create(config)?.write(contents.as_bytes())?;
+            File::create(config)?.write_all(contents.as_bytes())?;
             Ok(())
         }
         else {

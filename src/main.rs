@@ -7,7 +7,8 @@ extern crate failure;
 extern crate log;
 extern crate notify;
 extern crate pretty_env_logger;
-#[macro_use] #[cfg(test)]
+#[macro_use]
+#[cfg(test)]
 extern crate proptest;
 #[macro_use]
 extern crate serde_derive;
@@ -39,9 +40,7 @@ fn main() {
 
     let yaml = load_yaml!("../resources/cli.yml");
 
-    let cli = App::from_yaml(yaml)
-        .name(APP_NAME)
-        .version(APP_VERSION);
+    let cli = App::from_yaml(yaml).name(APP_NAME).version(APP_VERSION);
 
     let matches = cli.clone().get_matches();
 
@@ -57,9 +56,9 @@ fn main() {
             matches.value_of("home").map(PathBuf::from),
             matches.is_present("force")
         ),
-        ("watch", Some(_)) => commands::watch(config),
+        ("watch", Some(_)) => commands::watch(&config),
         ("check", Some(matches)) => commands::check(
-            config,
+            &config,
             matches.is_present("thorough"),
             matches.is_present("repair")
         ),
@@ -72,7 +71,10 @@ fn main() {
             );
             Ok(())
         }
-        _ => Ok(println!("{}", matches.usage()))
+        _ => {
+            println!("{}", matches.usage());
+            Ok(())
+        }
     };
 
     match result {

@@ -135,7 +135,7 @@ impl Dotfiles {
             .write(true)
             .create(true)
             .open(config.dotfiles())?
-            .write(contents.as_bytes())?;
+            .write_all(contents.as_bytes())?;
         Ok(())
     }
 
@@ -184,7 +184,8 @@ impl Dotfiles {
         info!("Attempting to repair broken symlinks in {:?}", home);
 
         let symlinks = self.get_symlinks(config.contents().as_path(), home.as_path());
-        for (_, symlink) in &symlinks {
+        // TODO traverse, yo
+        for symlink in symlinks.values() {
             symlink.repair()?;
         }
 
