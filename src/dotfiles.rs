@@ -24,26 +24,31 @@ pub struct Symlink {
 
 impl Symlink {
     fn new(expected: PathBuf, path: PathBuf, status: SymlinkStatus) -> Symlink {
-        Symlink { expected, path, status }
+        Symlink {
+            expected,
+            path,
+            status
+        }
     }
 
     pub fn get(contents: &Path, home: &Path, dotfile: &PathBuf) -> Symlink {
         let expected = contents.join(dotfile);
         let symlink = home.join(dotfile);
         match symlink.symlink_metadata() {
-            Ok(_) =>
-                match symlink.read_link() {
-                    Ok(actual) =>
-                        Symlink::new(
-                            expected.clone(),
-                            symlink,
-                            if expected == actual { SymlinkStatus::Ok } else { SymlinkStatus::Wrong }
-                        ),
-                    Err(_) =>
-                        Symlink::new(expected, symlink, SymlinkStatus::Wrong)
-                },
-            Err(err) =>
-                Symlink::new(expected, symlink, SymlinkStatus::Absent(Error::from(err)))
+            Ok(_) => match symlink.read_link() {
+                Ok(actual) => Symlink::new(
+                    expected.clone(),
+                    symlink,
+                    if expected == actual {
+                        SymlinkStatus::Ok
+                    }
+                    else {
+                        SymlinkStatus::Wrong
+                    }
+                ),
+                Err(_) => Symlink::new(expected, symlink, SymlinkStatus::Wrong)
+            },
+            Err(err) => Symlink::new(expected, symlink, SymlinkStatus::Absent(Error::from(err)))
         }
     }
 
@@ -59,7 +64,7 @@ impl Symlink {
                 info!("Deleting file {:?}", self.path);
                 fs::remove_file(self.path.clone())?;
                 self.create()?
-            },
+            }
             SymlinkStatus::Absent(_) => self.create()?,
             SymlinkStatus::Ok => ()
         }
@@ -90,27 +95,33 @@ impl Dotfiles {
     }
 
     pub fn get_absent_files(&self, contents: &Path) -> Vec<PathBuf> {
-        self.get_files().iter().filter_map(|dotfile| {
-            let expected = contents.join(dotfile);
-            if expected.exists() {
-                None
-            }
+        self.get_files()
+            .iter()
+            .filter_map(|dotfile| {
+                let expected = contents.join(dotfile);
+                if expected.exists() {
+                    None
+                }
                 else {
                     Some(dotfile.clone())
                 }
-        }).collect()
+            })
+            .collect()
     }
 
     pub fn get_symlinks(&self, contents: &Path, home: &Path) -> HashMap<PathBuf, Symlink> {
-        self.get_files().iter().map(|dotfile| {
-            (dotfile.clone(), Symlink::get(contents, home, dotfile))
-        }).collect()
+        self.get_files()
+            .iter()
+            .map(|dotfile| (dotfile.clone(), Symlink::get(contents, home, dotfile)))
+            .collect()
     }
 
     pub fn load(config: &Config) -> Result<Dotfiles, Error> {
         let mut contents = String::new();
         OpenOptions::new()
-            .write(true).read(true).create(true)
+            .write(true)
+            .read(true)
+            .create(true)
             .open(config.dotfiles())?
             .read_to_string(&mut contents)?;
         let dotfiles = toml::from_str::<Dotfiles>(contents.as_ref())?;
@@ -120,8 +131,11 @@ impl Dotfiles {
     pub fn save(&self, config: &Config) -> Result<(), Error> {
         let contents = toml::to_string(&self.canonicalize())?;
         OpenOptions::new()
-            .truncate(true).write(true).create(true)
-            .open(config.dotfiles())?.write(contents.as_bytes())?;
+            .truncate(true)
+            .write(true)
+            .create(true)
+            .open(config.dotfiles())?
+            .write(contents.as_bytes())?;
         Ok(())
     }
 
@@ -143,14 +157,20 @@ impl Dotfiles {
         for (dotfile, symlink) in &symlinks {
             match symlink.status {
                 SymlinkStatus::Wrong => {
-                    let msg = format!("{:?} is not a symlink or symlink with wrong target, expected: {:?}", dotfile, symlink.expected);
+                    let msg = format!(
+                        "{:?} is not a symlink or symlink with wrong target, expected: {:?}",
+                        dotfile, symlink.expected
+                    );
                     let err = DotfilesError::new(msg);
                     Err(err)?
-                },
+                }
                 SymlinkStatus::Absent(ref err) => {
-                    let msg = format!("{:?} does not exist, expected symbolic link to {:?} ({:?})", dotfile, symlink.expected, err);
+                    let msg = format!(
+                        "{:?} does not exist, expected symbolic link to {:?} ({:?})",
+                        dotfile, symlink.expected, err
+                    );
                     Err(DotfilesError::new(msg))?
-                },
+                }
                 SymlinkStatus::Ok => ()
             }
         }

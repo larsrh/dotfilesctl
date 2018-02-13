@@ -43,7 +43,12 @@ impl Config {
     }
 }
 
-pub fn init(config: &PathBuf, target: &PathBuf, home: Option<PathBuf>, force: bool) -> Result<(), Error> {
+pub fn init(
+    config: &PathBuf,
+    target: &PathBuf,
+    home: Option<PathBuf>,
+    force: bool
+) -> Result<(), Error> {
     if !target.is_dir() {
         let err = DotfilesError::new(format!("{:?} is not a directory", target));
         Err(err)?
@@ -77,7 +82,7 @@ pub mod test_util {
         let target = dir.path().join("target");
         fs::create_dir(&target).unwrap();
         let config = dir.path().join("config.toml");
-        init(&config, &target, Some(home),false).unwrap();
+        init(&config, &target, Some(home), false).unwrap();
         let config = Config::load(&config).unwrap();
         assert_eq!(target, config.target);
         fs::create_dir(config.contents()).unwrap();

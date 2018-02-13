@@ -1,11 +1,16 @@
-#[macro_use] extern crate clap;
+#[macro_use]
+extern crate clap;
 extern crate env_logger;
-#[macro_use] extern crate failure;
-#[macro_use] extern crate log;
+#[macro_use]
+extern crate failure;
+#[macro_use]
+extern crate log;
 extern crate notify;
 extern crate pretty_env_logger;
-#[macro_use] extern crate proptest;
-#[macro_use] extern crate serde_derive;
+#[macro_use]
+extern crate proptest;
+#[macro_use]
+extern crate serde_derive;
 extern crate tempdir;
 extern crate toml;
 extern crate xdg;
@@ -16,7 +21,7 @@ mod dotfiles;
 mod paths;
 mod util;
 
-use clap::{Arg, App, SubCommand};
+use clap::{App, Arg, SubCommand};
 use log::LevelFilter;
 use std::path::PathBuf;
 
@@ -28,74 +33,79 @@ fn main() {
     builder.filter(None, LevelFilter::Debug);
     builder.init();
 
-    let init_command =
-        SubCommand::with_name("init")
-            .arg(Arg::with_name("force")
+    let init_command = SubCommand::with_name("init")
+        .arg(
+            Arg::with_name("force")
                 .short("f")
                 .long("force")
-                .help("Overwrite existing configuration file"))
-            .arg(Arg::with_name("home")
+                .help("Overwrite existing configuration file")
+        )
+        .arg(
+            Arg::with_name("home")
                 .short("h")
                 .long("home")
                 .help("Specify home directory (default: auto-detected)")
-                .takes_value(true))
-            .arg(Arg::with_name("target")
+                .takes_value(true)
+        )
+        .arg(
+            Arg::with_name("target")
                 .value_name("DIR")
                 .help("Directory to scan for dotfiles")
-                .required(true));
+                .required(true)
+        );
 
-    let watch_command =
-        SubCommand::with_name("watch");
+    let watch_command = SubCommand::with_name("watch");
 
-    let check_command =
-        SubCommand::with_name("check")
-            .arg(Arg::with_name("thorough")
+    let check_command = SubCommand::with_name("check")
+        .arg(
+            Arg::with_name("thorough")
                 .short("t")
                 .long("throrough")
-                .help("Throrough check: scan dotfiles in home directory for dangling symlinks"))
-            .arg(Arg::with_name("repair")
+                .help("Throrough check: scan dotfiles in home directory for dangling symlinks")
+        )
+        .arg(
+            Arg::with_name("repair")
                 .short("r")
                 .long("repair")
-                .help("Repair broken files"));
+                .help("Repair broken files")
+        );
 
     let xdg_dirs = xdg::BaseDirectories::with_prefix(APP_NAME).unwrap();
 
-    let matches =
-        App::new(APP_NAME)
-            .version(APP_VERSION)
-            .arg(
-                Arg::with_name("config")
-                    .short("c")
-                    .long("config")
-                    .value_name("FILE")
-                    .help("Sets a custom config file")
-                    .takes_value(true))
-            .subcommand(init_command)
-            .subcommand(watch_command)
-            .subcommand(check_command)
-            .get_matches();
+    let matches = App::new(APP_NAME)
+        .version(APP_VERSION)
+        .arg(
+            Arg::with_name("config")
+                .short("c")
+                .long("config")
+                .value_name("FILE")
+                .help("Sets a custom config file")
+                .takes_value(true)
+        )
+        .subcommand(init_command)
+        .subcommand(watch_command)
+        .subcommand(check_command)
+        .get_matches();
 
-    let config = matches.value_of("config").map(PathBuf::from).unwrap_or_else(|| {
-        xdg_dirs.place_config_file("config.toml").unwrap()
-    });
+    let config = matches
+        .value_of("config")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| xdg_dirs.place_config_file("config.toml").unwrap());
 
     let result = match matches.subcommand() {
-        ("init", Some(matches)) =>
-            commands::init(
-                &config,
-                &PathBuf::from(matches.value_of("dir").unwrap()),
-                matches.value_of("home").map(PathBuf::from),
-                matches.is_present("force")),
-        ("watch", Some(_)) =>
-            commands::watch(config),
-        ("check", Some(matches)) =>
-            commands::check(
-                config,
-                matches.is_present("thorough"),
-                matches.is_present("repair")
-            ),
-        _ =>
-            Ok(println!("{}", matches.usage()))
+        ("init", Some(matches)) => commands::init(
+            &config,
+            &PathBuf::from(matches.value_of("dir").unwrap()),
+            matches.value_of("home").map(PathBuf::from),
+            matches.is_present("force")
+        ),
+        ("watch", Some(_)) => commands::watch(config),
+        ("check", Some(matches)) => commands::check(
+            config,
+            matches.is_present("thorough"),
+            matches.is_present("repair")
+        ),
+        _ => Ok(println!("{}", matches.usage()))
     };
 
     match result {

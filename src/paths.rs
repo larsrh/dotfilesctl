@@ -20,19 +20,18 @@ pub fn canonicalize_light<P: AsRef<Path>>(path: P) -> PathBuf {
     let mut buf = PathBuf::new();
     for component in path.as_ref().components() {
         match component {
-            Component::Prefix(_) | Component::RootDir | Component::Normal(_) =>
-                buf.push(PathBuf::from(component.as_os_str())),
-            Component::CurDir =>
-                {},
-            Component::ParentDir =>
-                if buf.file_name().is_none() {
-                    buf.push(PathBuf::from(component.as_os_str()));
-                }
-                else {
-                    buf.pop();
-                }
+            Component::Prefix(_) | Component::RootDir | Component::Normal(_) => {
+                buf.push(PathBuf::from(component.as_os_str()))
+            }
+            Component::CurDir => {}
+            Component::ParentDir => if buf.file_name().is_none() {
+                buf.push(PathBuf::from(component.as_os_str()));
+            }
+            else {
+                buf.pop();
+            }
         };
-    };
+    }
     buf
 }
 
@@ -66,8 +65,17 @@ mod tests {
 
     #[test]
     fn test_canonicalize_light() {
-        assert_eq!(canonicalize_light(Path::new("/a/b/..")).as_path(), Path::new("/a"));
-        assert_eq!(canonicalize_light(Path::new("/a/b/../..")).as_path(), Path::new("/"));
-        assert_eq!(canonicalize_light(Path::new("../../a")).as_path(), Path::new("../../a"));
+        assert_eq!(
+            canonicalize_light(Path::new("/a/b/..")).as_path(),
+            Path::new("/a")
+        );
+        assert_eq!(
+            canonicalize_light(Path::new("/a/b/../..")).as_path(),
+            Path::new("/")
+        );
+        assert_eq!(
+            canonicalize_light(Path::new("../../a")).as_path(),
+            Path::new("../../a")
+        );
     }
 }

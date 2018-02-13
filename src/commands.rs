@@ -7,7 +7,7 @@ use std::sync::mpsc::channel;
 use std::time::Duration;
 use paths::*;
 
-pub use config::init as init;
+pub use config::init;
 
 pub fn watch(config: PathBuf) -> Result<(), Error> {
     let config = Config::load(&config)?;
@@ -21,7 +21,7 @@ pub fn watch(config: PathBuf) -> Result<(), Error> {
             DebouncedEvent::Create(created) => {
                 let relative = relative_to(config.target.as_path(), created.as_path());
                 info!("File created: {:?}", relative)
-            },
+            }
             _ => {}
         }
     }
@@ -33,20 +33,18 @@ pub fn check(config: PathBuf, _thorough: bool, repair: bool) -> Result<(), Error
     let dotfiles = Dotfiles::load(&config)?;
 
     match dotfiles.check(&config) {
-        Ok(()) =>
-            info!("Checking successful!"),
-        Err(err) =>
-            if repair {
-                warn!("Found problems during checking:");
-                warn!("{}", err);
-                info!("Attempting to repair problems");
-                dotfiles.repair(&config)?;
-                info!("Rechecking");
-                dotfiles.check(&config)?;
-            }
-            else {
-                Err(err)?
-            }
+        Ok(()) => info!("Checking successful!"),
+        Err(err) => if repair {
+            warn!("Found problems during checking:");
+            warn!("{}", err);
+            info!("Attempting to repair problems");
+            dotfiles.repair(&config)?;
+            info!("Rechecking");
+            dotfiles.check(&config)?;
+        }
+        else {
+            Err(err)?
+        }
     }
 
     dotfiles.save(&config)?;
