@@ -1,5 +1,8 @@
 use config::*;
 use failure::Error;
+use fs_extra;
+use fs_extra::dir::CopyOptions;
+use paths;
 use std::collections::HashMap;
 use std::fs;
 use std::fs::OpenOptions;
@@ -188,6 +191,56 @@ impl Dotfiles {
         Ok(())
     }
 
+    pub fn track(
+        &self,
+        config: &Config,
+        file: &PathBuf,
+        validate_relative: fn(&PathBuf) -> Result<(), Error>
+    ) -> Result<Dotfiles, Error> {
+        let file_type = file.symlink_metadata()?.file_type();
+        if file_type.is_symlink() {
+            let msg = format!("Cannot track {:?} because it is a symlink", file);
+            Err(DotfilesError::new(msg))?
+        }
+
+        let file = file.canonicalize()?;
+        let home = config.get_home()?;
+        if !file.starts_with(home.clone()) {
+            let msg = format!(
+                "Cannot track {:?} because it is not in the home directory {:?}",
+                file, home
+            );
+            Err(DotfilesError::new(msg))?
+        }
+
+        let mut files = self.get_files();
+        let relative = paths::relative_to(&home, &file);
+        validate_relative(&relative)?;
+        if files.contains(&relative) {
+            let msg = format!("Cannot track {:?} because it is already tracked", file);
+            Err(DotfilesError::new(msg))?
+        }
+
+        if file_type.is_file() {
+            info!("Tracking {:?}", relative);
+        }
+        else {
+            info!("Tracking {:?} and all its children", relative);
+        }
+
+        let mut dest = config.contents();
+        dest.push(relative.clone());
+        let content_path = dest.clone();
+        dest.pop();
+        fs::create_dir_all(dest.clone())?;
+        fs_extra::move_items(&vec![file.clone()], dest, &CopyOptions::new())?;
+
+        unix::symlink(content_path, file)?;
+
+        files.push(relative);
+        Ok(Dotfiles::new(Some(files)))
+    }
+
     pub fn repair(
         &self,
         config: &Config,
@@ -226,6 +279,14 @@ mod tests {
         let path = config.contents().join(file);
         let msg = format!("{:?} can be created", path);
         File::create(path).expect(msg.as_ref());
+    }
+
+    fn setup_dotfile(config: &Config, file: &str) -> PathBuf {
+        let path = config.get_home().unwrap().join(file);
+        let content = file.as_bytes();
+        let mut file = File::create(path.clone()).unwrap();
+        file.write_all(content).unwrap();
+        path
     }
 
     fn setup_symlink(config: &Config, file: &str) {
@@ -303,5 +364,22 @@ mod tests {
         let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]));
         dotfiles.repair(&config, |_| Ok(true)).unwrap();
         dotfiles.check(&config).unwrap();
+    }
+
+    #[test]
+    fn test_track_file() {
+        let (_dir, config) = setup_config();
+        let file = ".test";
+        let path = setup_dotfile(&config, file);
+        let dotfiles = Dotfiles::load(&config).unwrap();
+        let dotfiles = dotfiles.track(&config, &path, |_| Ok(())).unwrap();
+        dotfiles.check(&config).unwrap();
+
+        let mut contents = String::new();
+        File::open(config.contents().join(file))
+            .unwrap()
+            .read_to_string(&mut contents)
+            .unwrap();
+        assert_eq!(contents, file);
     }
 }

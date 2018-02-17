@@ -5,7 +5,7 @@ use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use paths::*;
 use std::io;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Component, PathBuf};
 use std::sync::mpsc::channel;
 use std::time::Duration;
 use util::DotfilesError;
@@ -76,5 +76,60 @@ pub fn check(config: &PathBuf, _thorough: bool, repair: bool, force: bool) -> Re
     }
 
     dotfiles.save(&config)?;
+    Ok(())
+}
+
+pub fn track(config: &PathBuf, file: &PathBuf, skip_check: bool, force: bool) -> Result<(), Error> {
+    let config = Config::load(config)?;
+    let dotfiles = Dotfiles::load(&config)?;
+    if skip_check {
+        warn!("Skipping check, this is potentially dangerous")
+    }
+    else {
+        dotfiles.check(&config)?;
+    }
+
+    fn force_behaviour(_: &PathBuf) -> Result<(), Error> {
+        Ok(())
+    }
+
+    fn check_behaviour(path: &PathBuf) -> Result<(), Error> {
+        match path.components().next().unwrap() {
+            Component::Normal(str) => {
+                let str = str.to_str().ok_or_else(|| {
+                    let msg = format!("{:?} is not a valid UTF-8 path", path);
+                    DotfilesError::new(msg)
+                })?;
+                if !str.starts_with('.') {
+                    let msg = format!(
+                        "Only dotfiles can be tracked, {:?} does not start with a dot",
+                        path
+                    );
+                    Err(DotfilesError::new(msg))?
+                }
+            }
+            _ => {
+                let msg = format!(
+                    "Only dotfiles can be tracked, {:?} does not start with a normal path component",
+                    path
+                );
+                Err(DotfilesError::new(msg))?
+            }
+        };
+        Ok(())
+    }
+
+    dotfiles
+        .track(
+            &config,
+            file,
+            if force {
+                force_behaviour
+            }
+            else {
+                check_behaviour
+            }
+        )?
+        .save(&config)?;
     Ok(())
 }

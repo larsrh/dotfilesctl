@@ -3,6 +3,7 @@ extern crate clap;
 extern crate env_logger;
 #[macro_use]
 extern crate failure;
+extern crate fs_extra;
 #[macro_use]
 extern crate log;
 extern crate notify;
@@ -72,6 +73,12 @@ fn exec() -> Result<(), Error> {
             );
             Ok(())
         }
+        ("track", Some(matches)) => commands::track(
+            &config,
+            &PathBuf::from(matches.value_of("file").unwrap()),
+            matches.is_present("skip_check"),
+            force
+        ),
         _ => {
             println!("{}", matches.usage());
             Ok(())

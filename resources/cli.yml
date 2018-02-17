@@ -41,6 +41,18 @@ subcommands:
             short: r
             long: repair
             help: "Repair broken files"
+  - track:
+      about: "Import and track an existing dotfile"
+      args:
+        - file:
+            value_name: FILE
+            help: "Path to the existing dotfile"
+            takes_value: true
+            required: true
+        - skip_check:
+            short: s
+            long: skip-check
+            help: "Skip check before tracking (potentially dangerous)"
   - completions:
       about: "Generates completion scripts for your shell"
       args:
