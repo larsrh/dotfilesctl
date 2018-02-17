@@ -41,6 +41,7 @@ fn exec() -> Result<(), Error> {
         .version(util::APP_VERSION);
 
     let matches = cli.clone().get_matches();
+    let force = matches.is_present("force");
 
     let config = matches
         .value_of("config")
@@ -53,14 +54,14 @@ fn exec() -> Result<(), Error> {
             &config,
             &PathBuf::from(matches.value_of("dir").unwrap()),
             matches.value_of("home").map(PathBuf::from),
-            matches.is_present("force")
+            force
         ),
         ("watch", Some(_)) => commands::watch(&config),
         ("check", Some(matches)) => commands::check(
             &config,
             matches.is_present("thorough"),
             matches.is_present("repair"),
-            matches.is_present("force")
+            force
         ),
         ("completions", Some(matches)) => {
             let shell = matches.value_of("shell").unwrap();

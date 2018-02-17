@@ -10,14 +10,14 @@ args:
       value_name: FILE
       help: "Sets a custom config file"
       takes_value: true
+  - force:
+      short: f
+      long: force
+      help: "Force dangerous operation"
 subcommands:
   - init:
       about: "Initialize a configuration"
       args:
-        - force:
-            short: f
-            long: force
-            help: "Overwrite existing configuration file"
         - home:
             short: h
             long: home
@@ -41,11 +41,6 @@ subcommands:
             short: r
             long: repair
             help: "Repair broken files"
-        - force:
-            short: f
-            long: force
-            help: "When repairing, do not ask before deletion of a file"
-            requires: repair
   - completions:
       about: "Generates completion scripts for your shell"
       args:
