@@ -41,6 +41,11 @@ subcommands:
             short: r
             long: repair
             help: "Repair broken files"
+        - force:
+            short: f
+            long: force
+            help: "When repairing, do not ask before deletion of a file"
+            requires: repair
   - completions:
       about: "Generates completion scripts for your shell"
       args:

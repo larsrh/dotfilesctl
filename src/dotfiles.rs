@@ -58,12 +58,21 @@ impl Symlink {
         Ok(())
     }
 
-    pub fn repair(&self) -> Result<(), Error> {
+    pub fn repair(
+        &self,
+        wrong_behaviour: fn(&PathBuf) -> Result<bool, Error>
+    ) -> Result<(), Error> {
         match self.status {
             SymlinkStatus::Wrong => {
-                info!("Deleting file {:?}", self.path);
-                fs::remove_file(self.path.clone())?;
-                self.create()?
+                let skip = wrong_behaviour(&self.path)?;
+                if skip {
+                    warn!("Skipping file {:?}", self.path);
+                }
+                else {
+                    info!("Deleting file {:?}", self.path);
+                    fs::remove_file(self.path.clone())?;
+                    self.create()?
+                }
             }
             SymlinkStatus::Absent(_) => self.create()?,
             SymlinkStatus::Ok => ()
@@ -179,14 +188,18 @@ impl Dotfiles {
         Ok(())
     }
 
-    pub fn repair(&self, config: &Config) -> Result<(), Error> {
+    pub fn repair(
+        &self,
+        config: &Config,
+        wrong_behaviour: fn(&PathBuf) -> Result<bool, Error>
+    ) -> Result<(), Error> {
         let home = config.get_home()?;
         info!("Attempting to repair broken symlinks in {:?}", home);
 
         let symlinks = self.get_symlinks(config.contents().as_path(), home.as_path());
         // TODO traverse, yo
         for symlink in symlinks.values() {
-            symlink.repair()?;
+            symlink.repair(wrong_behaviour)?;
         }
 
         Ok(())
@@ -265,7 +278,7 @@ mod tests {
         let file = ".test";
         setup_content(&config, file);
         let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]));
-        dotfiles.repair(&config).unwrap();
+        dotfiles.repair(&config, |_| Ok(true)).unwrap();
         dotfiles.check(&config).unwrap();
     }
 
@@ -276,7 +289,19 @@ mod tests {
         setup_content(&config, file);
         setup_symlink_wrong(&config, file);
         let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]));
-        dotfiles.repair(&config).unwrap();
+        dotfiles.repair(&config, |_| Ok(false)).unwrap();
+        dotfiles.check(&config).unwrap();
+    }
+
+    #[test]
+    #[should_panic(expected = "is not a symlink or symlink with wrong target")]
+    fn test_repair_wrong_skip() {
+        let (_dir, config) = setup_config();
+        let file = ".test";
+        setup_content(&config, file);
+        setup_symlink_wrong(&config, file);
+        let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]));
+        dotfiles.repair(&config, |_| Ok(true)).unwrap();
         dotfiles.check(&config).unwrap();
     }
 }

@@ -60,7 +60,8 @@ fn main() {
         ("check", Some(matches)) => commands::check(
             &config,
             matches.is_present("thorough"),
-            matches.is_present("repair")
+            matches.is_present("repair"),
+            matches.is_present("force")
         ),
         ("completions", Some(matches)) => {
             let shell = matches.value_of("shell").unwrap();
