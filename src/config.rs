@@ -3,8 +3,9 @@ use std::env;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::PathBuf;
-use util::DotfilesError;
+use util::*;
 use toml;
+use xdg::BaseDirectories;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
@@ -41,6 +42,12 @@ impl Config {
     pub fn contents(&self) -> PathBuf {
         self.target.join("contents")
     }
+}
+
+pub fn get_path() -> Result<PathBuf, Error> {
+    let xdg_dirs = BaseDirectories::with_prefix(APP_NAME)?;
+    let path = xdg_dirs.place_config_file("config.toml")?;
+    Ok(path)
 }
 
 pub fn init(

@@ -1,5 +1,8 @@
 use std::fmt::{Display, Formatter, Result};
 
+pub static APP_VERSION: &'static str = crate_version!();
+pub static APP_NAME: &'static str = crate_name!();
+
 #[derive(Debug, Fail)]
 pub struct DotfilesError {
     pub description: String
