@@ -2,6 +2,13 @@
 name = "dotfilesctl"
 version = "0.1.0"
 authors = ["Lars Hupel <lars@hupel.info>"]
+repository = "https://github.com/larsrh/dotfilesctl"
+homepage = "https://github.com/larsrh/dotfilesctl"
+readme = "README.md"
+license = "Apache-2.0"
+description = """
+An application for tracking dotfiles, without assumptions about the backend storage.
+"""
 
 [dependencies]
 clap = { version = "^2.30", features = ["yaml"] }
