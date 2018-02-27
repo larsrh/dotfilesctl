@@ -27,3 +27,8 @@ xdg = "^2.1"
 
 [dev-dependencies]
 proptest = "^0.4"
+
+[package.metadata.release]
+sign-commit = true
+tag-prefix = "v"
+disable-push = true
