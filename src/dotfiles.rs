@@ -85,14 +85,30 @@ impl Symlink {
     }
 }
 
+#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone)]
+pub enum Version {
+    Ver1
+}
+
+impl Version {
+    pub fn default() -> Version {
+        Version::Ver1
+    }
+
+    pub fn latest() -> Version {
+        Version::Ver1
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Dotfiles {
-    files: Option<Vec<PathBuf>>
+    files: Option<Vec<PathBuf>>,
+    version: Option<Version>
 }
 
 impl Dotfiles {
     pub fn new(files: Option<Vec<PathBuf>>) -> Dotfiles {
-        Dotfiles { files }
+        Dotfiles { files, version: Some(Version::latest()) }
     }
 
     pub fn get_files(&self) -> Vec<PathBuf> {
@@ -102,8 +118,15 @@ impl Dotfiles {
         }
     }
 
+    pub fn get_version(&self) -> Version {
+        match self.version {
+            Some(ref version) => version.clone(),
+            None => Version::default()
+        }
+    }
+
     pub fn canonicalize(&self) -> Dotfiles {
-        Dotfiles::new(Some(self.get_files()))
+        Dotfiles { files: Some(self.get_files()), version: Some(self.get_version()) }
     }
 
     pub fn get_absent_files(&self, contents: &Path) -> Vec<PathBuf> {
