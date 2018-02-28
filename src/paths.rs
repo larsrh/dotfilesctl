@@ -16,6 +16,7 @@ pub fn relative_to(from: &Path, to: &Path) -> PathBuf {
     buf
 }
 
+#[allow(dead_code)]
 pub fn canonicalize_light<P: AsRef<Path>>(path: P) -> PathBuf {
     let mut buf = PathBuf::new();
     for component in path.as_ref().components() {
