@@ -11,6 +11,7 @@ use std::os::unix::fs as unix;
 use std::path::{Path, PathBuf};
 use std::vec::Vec;
 use toml;
+use toml::Value;
 use util::DotfilesError;
 
 pub enum SymlinkStatus {
@@ -85,30 +86,18 @@ impl Symlink {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone)]
-pub enum Version {
-    Ver1
-}
-
-impl Version {
-    pub fn default() -> Version {
-        Version::Ver1
-    }
-
-    pub fn latest() -> Version {
-        Version::Ver1
-    }
-}
-
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Dotfiles {
-    files: Option<Vec<PathBuf>>,
-    version: Option<Version>
+    version: Option<i64>, // always 1
+    files: Option<Vec<PathBuf>>
 }
 
 impl Dotfiles {
     pub fn new(files: Option<Vec<PathBuf>>) -> Dotfiles {
-        Dotfiles { files, version: Some(Version::latest()) }
+        Dotfiles {
+            files,
+            version: Some(1)
+        }
     }
 
     pub fn get_files(&self) -> Vec<PathBuf> {
@@ -118,15 +107,8 @@ impl Dotfiles {
         }
     }
 
-    pub fn get_version(&self) -> Version {
-        match self.version {
-            Some(ref version) => version.clone(),
-            None => Version::default()
-        }
-    }
-
     pub fn canonicalize(&self) -> Dotfiles {
-        Dotfiles { files: Some(self.get_files()), version: Some(self.get_version()) }
+        Dotfiles::new(Some(self.get_files()))
     }
 
     pub fn get_absent_files(&self, contents: &Path) -> Vec<PathBuf> {
@@ -159,8 +141,33 @@ impl Dotfiles {
             .create(true)
             .open(config.dotfiles())?
             .read_to_string(&mut contents)?;
-        let dotfiles = toml::from_str::<Dotfiles>(contents.as_ref())?;
-        Ok(dotfiles)
+        let toml = toml::from_str::<Value>(contents.as_ref())?;
+        if let Some(table) = toml.as_table() {
+            let version = if let Some(value) = table.get("version") {
+                value.clone().try_into::<i64>()?
+            }
+            else {
+                // use initial version that had no version tag
+                1
+            };
+
+            match version {
+                1 => {
+                    let dotfiles = toml.clone().try_into::<Dotfiles>()?;
+                    Ok(dotfiles)
+                }
+                _ => {
+                    let msg = format!("Invalid version number {:?}", version);
+                    let err = DotfilesError::new(msg);
+                    Err(err)?
+                }
+            }
+        }
+        else {
+            let msg = format!("Expected table, got {:?}", toml.type_str());
+            let err = DotfilesError::new(msg);
+            Err(err)?
+        }
     }
 
     pub fn save(&self, config: &Config) -> Result<(), Error> {
