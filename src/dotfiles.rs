@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use std::vec::Vec;
 use toml;
 use toml::Value;
-use util::DotfilesError;
+use util::*;
 
 pub enum SymlinkStatus {
     Ok,
@@ -56,16 +56,13 @@ impl Symlink {
         }
     }
 
-    pub fn create(&self) -> Result<(), Error> {
+    pub fn create(&self) -> Result<()> {
         info!("Creating symlink {:?}", self.expected);
         unix::symlink(self.expected.clone(), self.path.clone())?;
         Ok(())
     }
 
-    pub fn repair(
-        &self,
-        wrong_behaviour: fn(&PathBuf) -> Result<bool, Error>
-    ) -> Result<(), Error> {
+    pub fn repair(&self, wrong_behaviour: fn(&PathBuf) -> Result<bool>) -> Result<()> {
         match self.status {
             SymlinkStatus::Wrong => {
                 let skip = wrong_behaviour(&self.path)?;
@@ -133,7 +130,7 @@ impl Dotfiles {
             .collect()
     }
 
-    pub fn load(config: &Config) -> Result<Dotfiles, Error> {
+    pub fn load(config: &Config) -> Result<Dotfiles> {
         let mut contents = String::new();
         OpenOptions::new()
             .write(true)
@@ -170,7 +167,7 @@ impl Dotfiles {
         }
     }
 
-    pub fn save(&self, config: &Config) -> Result<(), Error> {
+    pub fn save(&self, config: &Config) -> Result<()> {
         let contents = toml::to_string(&self.canonicalize())?;
         OpenOptions::new()
             .truncate(true)
@@ -181,7 +178,7 @@ impl Dotfiles {
         Ok(())
     }
 
-    pub fn check(&self, config: &Config) -> Result<(), Error> {
+    pub fn check(&self, config: &Config) -> Result<()> {
         info!("Checking for absent content in {:?}", config.contents());
         let absent_contents = self.get_absent_files(config.contents().as_path());
         if absent_contents.is_empty() {
@@ -225,8 +222,8 @@ impl Dotfiles {
         &self,
         config: &Config,
         file: &PathBuf,
-        validate_relative: fn(&PathBuf) -> Result<(), Error>
-    ) -> Result<Dotfiles, Error> {
+        validate_relative: fn(&PathBuf) -> Result<()>
+    ) -> Result<Dotfiles> {
         let file_type = file.symlink_metadata()?.file_type();
         if file_type.is_symlink() {
             let msg = format!("Cannot track {:?} because it is a symlink", file);
@@ -274,8 +271,8 @@ impl Dotfiles {
     pub fn repair(
         &self,
         config: &Config,
-        wrong_behaviour: fn(&PathBuf) -> Result<bool, Error>
-    ) -> Result<(), Error> {
+        wrong_behaviour: fn(&PathBuf) -> Result<bool>
+    ) -> Result<()> {
         let home = config.get_home()?;
         info!("Attempting to repair broken symlinks in {:?}", home);
 

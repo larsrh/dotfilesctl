@@ -24,13 +24,13 @@ mod paths;
 mod util;
 
 use clap::{App, Shell};
-use failure::Error;
 use log::LevelFilter;
 use std::io;
 use std::path::PathBuf;
 use std::str::FromStr;
+use util::*;
 
-fn exec() -> Result<(), Error> {
+fn exec() -> Result<()> {
     let mut builder = pretty_env_logger::formatted_builder()?;
     builder.filter(None, LevelFilter::Debug);
     builder.init();
