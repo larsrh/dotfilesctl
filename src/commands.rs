@@ -71,7 +71,7 @@ pub fn check(config: &PathBuf, _thorough: bool, repair: bool, force: bool) -> Re
             warn!("Found problems during checking:");
             warn!("{}", err);
             info!("Attempting to repair problems");
-            dotfiles.repair(
+            let result = dotfiles.repair(
                 &config,
                 if force {
                     force_behaviour
@@ -80,8 +80,15 @@ pub fn check(config: &PathBuf, _thorough: bool, repair: bool, force: bool) -> Re
                     ask_behaviour
                 }
             )?;
-            info!("Rechecking");
-            dotfiles.check(&config)?;
+            match result {
+                RepairResult::Successful => {
+                    info!("Rechecking");
+                    dotfiles.check(&config)?
+                },
+                RepairResult::Skipped => {
+                    warn!("Skipped some files, problems remain")
+                }
+            }
         }
         else {
             Err(err)?

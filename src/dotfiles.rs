@@ -25,6 +25,27 @@ pub enum RepairAction {
     Delete
 }
 
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub enum RepairResult {
+    Successful,
+    Skipped
+}
+
+impl RepairResult {
+    pub fn coalesce(self: RepairResult, that: &RepairResult) -> RepairResult {
+        match self {
+            RepairResult::Skipped => RepairResult::Skipped,
+            _ => that.clone()
+        }
+    }
+
+    pub fn coalesce_all(results: Vec<RepairResult>) -> RepairResult {
+        results
+            .iter()
+            .fold(RepairResult::Successful, RepairResult::coalesce)
+    }
+}
+
 pub struct Symlink {
     pub expected: PathBuf,
     pub path: PathBuf,
@@ -67,24 +88,34 @@ impl Symlink {
         Ok(())
     }
 
-    pub fn repair(&self, wrong_behaviour: fn(&PathBuf) -> Result<RepairAction>) -> Result<()> {
-        match self.status {
+    pub fn repair(
+        &self,
+        wrong_behaviour: fn(&PathBuf) -> Result<RepairAction>
+    ) -> Result<RepairResult> {
+        let result = match self.status {
             SymlinkStatus::Wrong => {
                 let action = wrong_behaviour(&self.path)?;
                 match action {
-                    RepairAction::Skip => warn!("Skipping file {:?}", self.path),
+                    RepairAction::Skip => {
+                        warn!("Skipping file {:?}", self.path);
+                        RepairResult::Skipped
+                    }
                     RepairAction::Delete => {
                         info!("Deleting file {:?}", self.path);
                         fs::remove_file(self.path.clone())?;
-                        self.create()?
+                        self.create()?;
+                        RepairResult::Successful
                     }
                 }
             }
-            SymlinkStatus::Absent(_) => self.create()?,
-            SymlinkStatus::Ok => ()
-        }
+            SymlinkStatus::Absent(_) => {
+                self.create()?;
+                RepairResult::Successful
+            }
+            SymlinkStatus::Ok => RepairResult::Successful
+        };
 
-        Ok(())
+        Ok(result)
     }
 }
 
@@ -277,17 +308,19 @@ impl Dotfiles {
         &self,
         config: &Config,
         wrong_behaviour: fn(&PathBuf) -> Result<RepairAction>
-    ) -> Result<()> {
+    ) -> Result<RepairResult> {
         let home = config.get_home()?;
         info!("Attempting to repair broken symlinks in {:?}", home);
 
         let symlinks = self.get_symlinks(config.contents().as_path(), home.as_path());
-        // TODO traverse, yo
-        for symlink in symlinks.values() {
-            symlink.repair(wrong_behaviour)?;
-        }
 
-        Ok(())
+        // Rust type inference weirdness
+        let skippeds: Result<Vec<_>> = symlinks
+            .values()
+            .map(|symlink| symlink.repair(wrong_behaviour))
+            .collect();
+
+        Ok(RepairResult::coalesce_all(skippeds?))
     }
 }
 
@@ -371,7 +404,12 @@ mod tests {
         let file = ".test";
         setup_content(&config, file);
         let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]));
-        dotfiles.repair(&config, |_| Ok(RepairAction::Skip)).unwrap();
+        assert_eq!(
+            RepairResult::Successful,
+            dotfiles
+                .repair(&config, |_| Ok(RepairAction::Skip))
+                .unwrap()
+        );
         dotfiles.check(&config).unwrap();
     }
 
@@ -382,7 +420,12 @@ mod tests {
         setup_content(&config, file);
         setup_symlink_wrong(&config, file);
         let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]));
-        dotfiles.repair(&config, |_| Ok(RepairAction::Delete)).unwrap();
+        assert_eq!(
+            RepairResult::Successful,
+            dotfiles
+                .repair(&config, |_| Ok(RepairAction::Delete))
+                .unwrap()
+        );
         dotfiles.check(&config).unwrap();
     }
 
@@ -394,7 +437,12 @@ mod tests {
         setup_content(&config, file);
         setup_symlink_wrong(&config, file);
         let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]));
-        dotfiles.repair(&config, |_| Ok(RepairAction::Skip)).unwrap();
+        assert_eq!(
+            RepairResult::Skipped,
+            dotfiles
+                .repair(&config, |_| Ok(RepairAction::Skip))
+                .unwrap()
+        );
         dotfiles.check(&config).unwrap();
     }
 
