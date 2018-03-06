@@ -1,6 +1,5 @@
 use config::*;
 use dotfiles::*;
-use failure::Error;
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use paths::*;
 use std::io;
@@ -8,11 +7,11 @@ use std::io::Write;
 use std::path::{Component, PathBuf};
 use std::sync::mpsc::channel;
 use std::time::Duration;
-use util::DotfilesError;
+use util::*;
 
 pub use config::init;
 
-pub fn watch(config: &PathBuf) -> Result<(), Error> {
+pub fn watch(config: &PathBuf) -> Result<()> {
     let config = Config::load(config)?;
     let (tx, rx) = channel();
     let mut watcher: RecommendedWatcher = Watcher::new(tx, Duration::from_secs(2))?;
@@ -28,16 +27,16 @@ pub fn watch(config: &PathBuf) -> Result<(), Error> {
 }
 
 // TODO implement thorough checking
-pub fn check(config: &PathBuf, _thorough: bool, repair: bool, force: bool) -> Result<(), Error> {
+pub fn check(config: &PathBuf, _thorough: bool, repair: bool, force: bool) -> Result<()> {
     let config = Config::load(config)?;
     let dotfiles = Dotfiles::load(&config)?;
 
-    fn force_behaviour(path: &PathBuf) -> Result<bool, Error> {
+    fn force_behaviour(path: &PathBuf) -> Result<bool> {
         info!("Deleting {:?}", path);
         Ok(false)
     }
 
-    fn ask_behaviour(path: &PathBuf) -> Result<bool, Error> {
+    fn ask_behaviour(path: &PathBuf) -> Result<bool> {
         print!("Delete {:?} [y/N]? ", path);
         io::stdout().flush()?;
         let mut buffer = String::new();
@@ -79,7 +78,7 @@ pub fn check(config: &PathBuf, _thorough: bool, repair: bool, force: bool) -> Re
     Ok(())
 }
 
-pub fn track(config: &PathBuf, file: &PathBuf, skip_check: bool, force: bool) -> Result<(), Error> {
+pub fn track(config: &PathBuf, file: &PathBuf, skip_check: bool, force: bool) -> Result<()> {
     let config = Config::load(config)?;
     let dotfiles = Dotfiles::load(&config)?;
     if skip_check {
@@ -89,17 +88,17 @@ pub fn track(config: &PathBuf, file: &PathBuf, skip_check: bool, force: bool) ->
         dotfiles.check(&config)?;
     }
 
-    fn force_behaviour(_: &PathBuf) -> Result<(), Error> {
+    fn force_behaviour(_: &PathBuf) -> Result<()> {
         Ok(())
     }
 
-    fn check_behaviour(path: &PathBuf) -> Result<(), Error> {
+    fn check_behaviour(path: &PathBuf) -> Result<()> {
         match path.components().next().unwrap() {
             Component::Normal(str) => {
-                let str = str.to_str().ok_or_else(|| {
-                    let msg = format!("{:?} is not a valid UTF-8 path", path);
-                    DotfilesError::new(msg)
-                })?;
+                let str = result_from_option(
+                    str.to_str(),
+                    format!("{:?} is not a valid UTF-8 path", path)
+                )?;
                 if !str.starts_with('.') {
                     let msg = format!(
                         "Only dotfiles can be tracked, {:?} does not start with a dot",

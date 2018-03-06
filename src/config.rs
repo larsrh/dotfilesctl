@@ -1,4 +1,3 @@
-use failure::Error;
 use std::env;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -18,21 +17,22 @@ impl Config {
         Config { target, home }
     }
 
-    pub fn load(config: &PathBuf) -> Result<Config, Error> {
+    pub fn load(config: &PathBuf) -> Result<Config> {
         let mut contents = String::new();
         File::open(config)?.read_to_string(&mut contents)?;
         let config = toml::from_str::<Config>(contents.as_ref())?;
         Ok(config)
     }
 
-    pub fn get_home(&self) -> Result<PathBuf, DotfilesError> {
-        match self.home.clone().or_else(env::home_dir) {
+    pub fn get_home(&self) -> Result<PathBuf> {
+        let path = match self.home.clone().or_else(env::home_dir) {
             Some(home) => Ok(home),
             None => {
                 let msg = "No home directory configured and none could be detected";
                 Err(DotfilesError::new(msg.to_string()))
             }
-        }
+        }?;
+        Ok(path)
     }
 
     pub fn dotfiles(&self) -> PathBuf {
@@ -44,18 +44,13 @@ impl Config {
     }
 }
 
-pub fn get_path() -> Result<PathBuf, Error> {
+pub fn get_path() -> Result<PathBuf> {
     let xdg_dirs = BaseDirectories::with_prefix(APP_NAME)?;
     let path = xdg_dirs.place_config_file("config.toml")?;
     Ok(path)
 }
 
-pub fn init(
-    config: &PathBuf,
-    target: &PathBuf,
-    home: Option<PathBuf>,
-    force: bool
-) -> Result<(), Error> {
+pub fn init(config: &PathBuf, target: &PathBuf, home: Option<PathBuf>, force: bool) -> Result<()> {
     if !target.is_dir() {
         let err = DotfilesError::new(format!("{:?} is not a directory", target));
         Err(err)?
