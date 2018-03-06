@@ -46,19 +46,19 @@ pub fn check(config: &PathBuf, _thorough: bool, repair: bool, force: bool) -> Re
     let config = Config::load(config)?;
     let dotfiles = Dotfiles::load(&config)?;
 
-    fn force_behaviour(path: &PathBuf) -> Result<bool> {
+    fn force_behaviour(path: &PathBuf) -> Result<RepairAction> {
         info!("Deleting {:?}", path);
-        Ok(false)
+        Ok(RepairAction::Delete)
     }
 
-    fn ask_behaviour(path: &PathBuf) -> Result<bool> {
+    fn ask_behaviour(path: &PathBuf) -> Result<RepairAction> {
         print!("Delete {:?} [y/N]? ", path);
         io::stdout().flush()?;
         let mut buffer = String::new();
         io::stdin().read_line(&mut buffer)?;
         match buffer.as_str().trim() {
-            "" | "N" => Ok(true),
-            "y" => Ok(false),
+            "" | "N" => Ok(RepairAction::Skip),
+            "y" => Ok(RepairAction::Delete),
             _ => {
                 let msg = format!("Invalid answer: {}", buffer);
                 Err(DotfilesError::new(msg))?

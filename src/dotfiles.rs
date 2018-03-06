@@ -20,6 +20,11 @@ pub enum SymlinkStatus {
     Wrong
 }
 
+pub enum RepairAction {
+    Skip,
+    Delete
+}
+
 pub struct Symlink {
     pub expected: PathBuf,
     pub path: PathBuf,
@@ -62,17 +67,17 @@ impl Symlink {
         Ok(())
     }
 
-    pub fn repair(&self, wrong_behaviour: fn(&PathBuf) -> Result<bool>) -> Result<()> {
+    pub fn repair(&self, wrong_behaviour: fn(&PathBuf) -> Result<RepairAction>) -> Result<()> {
         match self.status {
             SymlinkStatus::Wrong => {
-                let skip = wrong_behaviour(&self.path)?;
-                if skip {
-                    warn!("Skipping file {:?}", self.path);
-                }
-                else {
-                    info!("Deleting file {:?}", self.path);
-                    fs::remove_file(self.path.clone())?;
-                    self.create()?
+                let action = wrong_behaviour(&self.path)?;
+                match action {
+                    RepairAction::Skip => warn!("Skipping file {:?}", self.path),
+                    RepairAction::Delete => {
+                        info!("Deleting file {:?}", self.path);
+                        fs::remove_file(self.path.clone())?;
+                        self.create()?
+                    }
                 }
             }
             SymlinkStatus::Absent(_) => self.create()?,
@@ -271,7 +276,7 @@ impl Dotfiles {
     pub fn repair(
         &self,
         config: &Config,
-        wrong_behaviour: fn(&PathBuf) -> Result<bool>
+        wrong_behaviour: fn(&PathBuf) -> Result<RepairAction>
     ) -> Result<()> {
         let home = config.get_home()?;
         info!("Attempting to repair broken symlinks in {:?}", home);
@@ -366,7 +371,7 @@ mod tests {
         let file = ".test";
         setup_content(&config, file);
         let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]));
-        dotfiles.repair(&config, |_| Ok(true)).unwrap();
+        dotfiles.repair(&config, |_| Ok(RepairAction::Skip)).unwrap();
         dotfiles.check(&config).unwrap();
     }
 
@@ -377,7 +382,7 @@ mod tests {
         setup_content(&config, file);
         setup_symlink_wrong(&config, file);
         let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]));
-        dotfiles.repair(&config, |_| Ok(false)).unwrap();
+        dotfiles.repair(&config, |_| Ok(RepairAction::Delete)).unwrap();
         dotfiles.check(&config).unwrap();
     }
 
@@ -389,7 +394,7 @@ mod tests {
         setup_content(&config, file);
         setup_symlink_wrong(&config, file);
         let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]));
-        dotfiles.repair(&config, |_| Ok(true)).unwrap();
+        dotfiles.repair(&config, |_| Ok(RepairAction::Skip)).unwrap();
         dotfiles.check(&config).unwrap();
     }
 
