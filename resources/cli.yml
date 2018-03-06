@@ -10,10 +10,12 @@ args:
       value_name: FILE
       help: "Sets a custom config file"
       takes_value: true
+      global: true
   - force:
       short: f
       long: force
       help: "Force dangerous operation"
+      global: true
 subcommands:
   - init:
       about: "Initialize a configuration"
