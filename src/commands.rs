@@ -46,8 +46,7 @@ pub fn check(config: &PathBuf, _thorough: bool, repair: bool, force: bool) -> Re
     let config = Config::load(config)?;
     let dotfiles = Dotfiles::load(&config)?;
 
-    fn force_behaviour(path: &PathBuf) -> Result<RepairAction> {
-        info!("Deleting {:?}", path);
+    fn force_behaviour(_: &PathBuf) -> Result<RepairAction> {
         Ok(RepairAction::Delete)
     }
 
