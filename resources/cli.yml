@@ -41,6 +41,8 @@ subcommands:
             short: r
             long: repair
             help: "Repair broken files"
+  - list:
+      about: "List all tracked dotfiles"
   - track:
       about: "Import and track an existing dotfile"
       args:

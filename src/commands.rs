@@ -26,6 +26,21 @@ pub fn watch(config: &PathBuf) -> Result<()> {
     }
 }
 
+pub fn list(config: &PathBuf) -> Result<()> {
+    let config = Config::load(config)?;
+    let dotfiles = Dotfiles::load(&config)?;
+    for file in dotfiles.get_files() {
+        println!(
+            "{}",
+            result_from_option(
+                file.to_str(),
+                format!("{:?} is not a valid UTF-8 path", file)
+            )?
+        )
+    }
+    Ok(())
+}
+
 // TODO implement thorough checking
 pub fn check(config: &PathBuf, _thorough: bool, repair: bool, force: bool) -> Result<()> {
     let config = Config::load(config)?;

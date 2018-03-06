@@ -73,6 +73,7 @@ fn exec() -> Result<(), Error> {
             );
             Ok(())
         }
+        ("list", Some(_)) => commands::list(&config),
         ("track", Some(matches)) => commands::track(
             &config,
             &PathBuf::from(matches.value_of("file").unwrap()),
