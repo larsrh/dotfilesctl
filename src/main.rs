@@ -53,7 +53,7 @@ fn exec() -> Result<()> {
     match matches.subcommand() {
         ("init", Some(matches)) => commands::init(
             &config,
-            &PathBuf::from(matches.value_of("dir").unwrap()),
+            &PathBuf::from(matches.value_of("target").unwrap()),
             matches.value_of("home").map(PathBuf::from),
             force
         ),
