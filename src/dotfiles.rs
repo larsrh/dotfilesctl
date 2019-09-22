@@ -1,8 +1,6 @@
-use config::*;
 use failure::Error;
 use fs_extra;
 use fs_extra::dir::CopyOptions;
-use paths;
 use std::collections::HashMap;
 use std::fs;
 use std::fs::OpenOptions;
@@ -12,7 +10,9 @@ use std::path::{Path, PathBuf};
 use std::vec::Vec;
 use toml;
 use toml::Value;
-use util::*;
+use crate::config::*;
+use crate::paths;
+use crate::util::*;
 
 pub enum SymlinkStatus {
     Ok,
@@ -326,10 +326,11 @@ impl Dotfiles {
 
 #[cfg(test)]
 mod tests {
-    use config::test_util::*;
-    use dotfiles::*;
     use std::fs::File;
     use std::os::unix::fs as unix;
+    use crate::config::Config;
+    use crate::config::test_util::*;
+    use crate::dotfiles::*;
 
     #[test]
     fn test_empty_dotfiles() {

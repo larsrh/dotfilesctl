@@ -1,10 +1,10 @@
-use std::env;
+use dirs;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::PathBuf;
-use util::*;
 use toml;
 use xdg::BaseDirectories;
+use crate::util::*;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
@@ -25,7 +25,7 @@ impl Config {
     }
 
     pub fn get_home(&self) -> Result<PathBuf> {
-        let path = match self.home.clone().or_else(env::home_dir) {
+        let path = match self.home.clone().or_else(dirs::home_dir) {
             Some(home) => Ok(home),
             None => {
                 let msg = "No home directory configured and none could be detected";
@@ -73,9 +73,9 @@ pub fn init(config: &PathBuf, target: &PathBuf, home: Option<PathBuf>, force: bo
 
 #[cfg(test)]
 pub mod test_util {
-    use config::*;
     use std::fs;
     use tempdir::TempDir;
+    use crate::config::*;
 
     pub fn setup_config() -> (TempDir, Config) {
         let dir = TempDir::new("dotfilesctl_test").unwrap();
@@ -94,7 +94,7 @@ pub mod test_util {
 
 #[cfg(test)]
 mod tests {
-    use config::test_util::*;
+    use crate::config::test_util::*;
 
     #[test]
     fn test_setup() {
