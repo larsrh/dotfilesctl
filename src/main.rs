@@ -32,7 +32,7 @@ use std::str::FromStr;
 use util::*;
 
 fn exec() -> Result<()> {
-    let mut builder = pretty_env_logger::formatted_builder()?;
+    let mut builder = pretty_env_logger::formatted_builder();
     builder.filter(None, LevelFilter::Debug);
     builder.init();
 
