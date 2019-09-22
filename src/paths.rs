@@ -39,7 +39,7 @@ pub fn canonicalize_light<P: AsRef<Path>>(path: P) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use std::path::Path;
-    use paths::*;
+    use crate::paths::*;
 
     fn assert_relative_to(from: &str, to: &str, res: &str) {
         let from = Path::new(from);

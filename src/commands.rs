@@ -1,15 +1,15 @@
-use config::*;
-use dotfiles::*;
 use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
-use paths::*;
 use std::io;
 use std::io::Write;
 use std::path::{Component, PathBuf};
 use std::sync::mpsc::channel;
 use std::time::Duration;
-use util::*;
+use crate::config::*;
+use crate::dotfiles::*;
+use crate::paths::*;
+use crate::util::*;
 
-pub use config::init;
+pub use crate::config::init;
 
 pub fn watch(config: &PathBuf) -> Result<()> {
     let config = Config::load(config)?;

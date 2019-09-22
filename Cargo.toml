@@ -1,5 +1,6 @@
 [package]
 name = "dotfilesctl"
+edition = "2018"
 version = "0.2.1-alpha.0"
 authors = ["Lars Hupel <lars@hupel.info>"]
 repository = "https://github.com/larsrh/dotfilesctl"
@@ -12,6 +13,7 @@ An application for tracking dotfiles, without assumptions about the backend stor
 
 [dependencies]
 clap = { version = "^2.30", features = ["yaml"] }
+dirs = "^2.0"
 env_logger = "^0.5"
 failure = "^0.1"
 fs_extra = "^1.1"
