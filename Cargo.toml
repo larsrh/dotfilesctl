@@ -12,23 +12,22 @@ An application for tracking dotfiles, without assumptions about the backend stor
 """
 
 [dependencies]
-clap = { version = "^2.30", features = ["yaml"] }
+clap = { version = "^2.33", features = ["yaml"] }
 dirs = "^2.0"
-env_logger = "^0.5"
+env_logger = "^0.6"
 failure = "^0.1"
 fs_extra = "^1.1"
 log = "^0.4"
 notify = "^4.0"
-notify-rust = "^3"
-pretty_env_logger = "^0.2"
+pretty_env_logger = "^0.3"
 serde = "^1.0"
 serde_derive = "^1.0"
 tempdir = "^0.3"
-toml = "^0.4"
-xdg = "^2.1"
+toml = "^0.5"
+xdg = "^2.2"
 
 [dev-dependencies]
-proptest = "^0.4"
+proptest = "^0.9"
 
 [package.metadata.release]
 sign-commit = true
