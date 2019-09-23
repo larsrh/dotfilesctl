@@ -61,7 +61,6 @@ fn exec() -> Result<()> {
         ("watch", Some(_)) => commands::watch(&config),
         ("check", Some(matches)) => commands::check(
             &config,
-            matches.is_present("thorough"),
             matches.is_present("repair"),
             force
         ),
@@ -79,6 +78,11 @@ fn exec() -> Result<()> {
             &config,
             &PathBuf::from(matches.value_of("file").unwrap()),
             matches.is_present("skip_check"),
+            force
+        ),
+        ("untrack", Some(matches)) => commands::untrack(
+            &config,
+            &PathBuf::from(matches.value_of("file").unwrap()),
             force
         ),
         _ => {

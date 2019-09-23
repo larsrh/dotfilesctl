@@ -41,8 +41,7 @@ pub fn list(config: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-// TODO implement thorough checking
-pub fn check(config: &PathBuf, _thorough: bool, repair: bool, force: bool) -> Result<()> {
+pub fn check(config: &PathBuf, repair: bool, force: bool) -> Result<()> {
     let config = Config::load(config)?;
     let dotfiles = Dotfiles::load(&config)?;
 
@@ -148,6 +147,41 @@ pub fn track(config: &PathBuf, file: &PathBuf, skip_check: bool, force: bool) ->
             }
             else {
                 check_behaviour
+            }
+        )?
+        .save(&config)?;
+    Ok(())
+}
+
+pub fn untrack(config: &PathBuf, file: &PathBuf, force: bool) -> Result<()> {
+    let config = Config::load(config)?;
+    let dotfiles = Dotfiles::load(&config)?;
+    dotfiles.check(&config)?;
+
+    fn force_behaviour(_: &PathBuf) -> Result<()> {
+        Ok(())
+    }
+
+    fn ask_behaviour(path: &PathBuf) -> Result<()> {
+        print!("Delete {:?} [y/N]? ", path);
+        io::stdout().flush()?;
+        let mut buffer = String::new();
+        io::stdin().read_line(&mut buffer)?;
+        match buffer.as_str().trim() {
+            "y" => Ok(()),
+            _ => Err(DotfilesError::new(format!("Not deleting")))?
+        }
+    }
+
+    dotfiles
+        .untrack(
+            &config,
+            file,
+            if force {
+                force_behaviour
+            }
+            else {
+                ask_behaviour
             }
         )?
         .save(&config)?;

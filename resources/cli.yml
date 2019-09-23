@@ -57,6 +57,14 @@ subcommands:
             short: s
             long: skip-check
             help: "Skip check before tracking (potentially dangerous)"
+  - untrack:
+      about: "Untrack and delete a tracked dotfile"
+      args:
+        - file:
+            value_name: FILE
+            help: "Path to the tracked dotfile"
+            takes_value: true
+            required: true
   - completions:
       about: "Generates completion scripts for your shell"
       args:

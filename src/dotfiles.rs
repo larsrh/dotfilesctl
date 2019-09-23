@@ -122,13 +122,15 @@ impl Symlink {
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq)]
 pub struct Dotfiles {
     version: Option<i64>, // always 1
-    files: Option<Vec<PathBuf>>
+    files: Option<Vec<PathBuf>>,
+    deleted: Option<Vec<PathBuf>>
 }
 
 impl Dotfiles {
-    pub fn new(files: Option<Vec<PathBuf>>) -> Dotfiles {
+    pub fn new(files: Option<Vec<PathBuf>>, deleted: Option<Vec<PathBuf>>) -> Dotfiles {
         Dotfiles {
             files,
+            deleted,
             version: Some(1)
         }
     }
@@ -140,23 +142,23 @@ impl Dotfiles {
         }
     }
 
+    pub fn get_deleted(&self) -> Vec<PathBuf> {
+        match self.deleted {
+            Some(ref deleted) => deleted.clone(),
+            None => vec![]
+        }
+    }
+
     pub fn canonicalize(&self) -> Dotfiles {
-        Dotfiles::new(Some(self.get_files()))
+        Dotfiles::new(Some(self.get_files()), Some(self.get_deleted()))
     }
 
     pub fn get_absent_files(&self, contents: &Path) -> Vec<PathBuf> {
-        self.get_files()
-            .iter()
-            .filter_map(|dotfile| {
-                let expected = contents.join(dotfile);
-                if expected.exists() {
-                    None
-                }
-                else {
-                    Some(dotfile.clone())
-                }
-            })
-            .collect()
+        unexpected_files(contents, &self.get_files(), true)
+    }
+
+    pub fn get_spurious_files(&self, contents: &Path) -> Vec<PathBuf> {
+        unexpected_files(contents, &self.get_deleted(), false)
     }
 
     pub fn get_symlinks(&self, contents: &Path, home: &Path) -> HashMap<PathBuf, Symlink> {
@@ -215,6 +217,23 @@ impl Dotfiles {
     }
 
     pub fn check(&self, config: &Config) -> Result<()> {
+        info!("Checking consistency");
+        let files = self.get_files();
+        let deleted = self.get_deleted();
+        if !is_unique(&files) || !is_unique(&deleted) {
+            let msg = format!("Duplicate files");
+            let err = DotfilesError::new(msg);
+            Err(err)?
+        }
+
+        if let Some(f) = files.iter().find(|f| { deleted.contains(f) }) {
+            let msg = format!("File {:?} is both listed and deleted", f);
+            let err = DotfilesError::new(msg);
+            Err(err)?
+        }
+
+        info!("Consistent.");
+
         info!("Checking for absent content in {:?}", config.contents());
         let absent_contents = self.get_absent_files(config.contents().as_path());
         if absent_contents.is_empty() {
@@ -222,6 +241,17 @@ impl Dotfiles {
         }
         else {
             let msg = format!("Absent content: {:?}", absent_contents);
+            let err = DotfilesError::new(msg);
+            Err(err)?
+        }
+
+        info!("Checking for spurious content in {:?}", config.contents());
+        let spurious_contents = self.get_spurious_files(config.contents().as_path());
+        if spurious_contents.is_empty() {
+            info!("No spurious content.")
+        }
+        else {
+            let msg = format!("Spurious content: {:?}", spurious_contents);
             let err = DotfilesError::new(msg);
             Err(err)?
         }
@@ -277,10 +307,15 @@ impl Dotfiles {
         }
 
         let mut files = self.get_files();
+        let deleted = self.get_deleted();
         let relative = paths::relative_to(&home, &file);
         validate_relative(&relative)?;
         if files.contains(&relative) {
             let msg = format!("Cannot track {:?} because it is already tracked", file);
+            Err(DotfilesError::new(msg))?
+        }
+        if deleted.contains(&relative) {
+            let msg = format!("Cannot track {:?} because it has been deleted", file);
             Err(DotfilesError::new(msg))?
         }
 
@@ -301,7 +336,48 @@ impl Dotfiles {
         unix::symlink(content_path, file)?;
 
         files.push(relative);
-        Ok(Dotfiles::new(Some(files)))
+        Ok(Dotfiles::new(Some(files), Some(deleted)))
+    }
+
+    pub fn untrack(
+        &self,
+        config: &Config,
+        file: &PathBuf,
+        confirm_delete: fn(&PathBuf) -> Result<()>
+    ) -> Result<Dotfiles> {
+        let home = config.get_home()?;
+        if !file.starts_with(home.clone()) {
+            let msg = format!(
+                "Cannot untrack {:?} because it is not in the home directory {:?}",
+                file, home
+            );
+            Err(DotfilesError::new(msg))?
+        }
+
+        let mut files = self.get_files();
+        let mut deleted = self.get_deleted();
+        let relative = paths::relative_to(&home, &file);
+        if !files.contains(&relative) {
+            let msg = format!("Cannot untrack {:?} because it is not tracked", relative);
+            Err(DotfilesError::new(msg))?
+        }
+        if deleted.contains(&relative) {
+            let msg = format!("Cannot untrack {:?} because it has already been deleted", relative);
+            Err(DotfilesError::new(msg))?
+        }
+
+        let mut dest = config.contents();
+        dest.push(relative.clone());
+
+        confirm_delete(&dest)?;
+        fs::remove_file(dest)?;
+
+        confirm_delete(&file)?;
+        fs::remove_file(file)?;
+
+        files.remove(files.iter().position(|file| *file == relative).unwrap());
+        deleted.push(relative);
+        Ok(Dotfiles::new(Some(files), Some(deleted)))
     }
 
     pub fn repair(
@@ -338,7 +414,7 @@ mod tests {
         let dotfiles = Dotfiles::load(&config).unwrap();
         dotfiles.save(&config).unwrap();
         let dotfiles = Dotfiles::load(&config).unwrap();
-        assert_eq!(dotfiles, Dotfiles::new(Some(vec![])));
+        assert_eq!(dotfiles, Dotfiles::new(Some(vec![]), Some(vec![])));
     }
 
     fn setup_content(config: &Config, file: &str) {
@@ -377,7 +453,7 @@ mod tests {
             setup_content(&config, f);
             setup_symlink(&config, f);
         }
-        let dotfiles = Dotfiles::new(Some(files.iter().map(PathBuf::from).collect()));
+        let dotfiles = Dotfiles::new(Some(files.iter().map(PathBuf::from).collect()), Some(vec![]));
         dotfiles.check(&config).unwrap();
     }
 
@@ -385,7 +461,7 @@ mod tests {
     #[should_panic(expected = "Absent content")]
     fn test_check_failure_missing() {
         let (_dir, config) = setup_config();
-        let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(".test")]));
+        let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(".test")]), Some(vec![]));
         dotfiles.check(&config).unwrap();
     }
 
@@ -395,7 +471,7 @@ mod tests {
         let (_dir, config) = setup_config();
         let file = ".test";
         setup_content(&config, file);
-        let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]));
+        let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]), Some(vec![]));
         dotfiles.check(&config).unwrap();
     }
 
@@ -404,7 +480,7 @@ mod tests {
         let (_dir, config) = setup_config();
         let file = ".test";
         setup_content(&config, file);
-        let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]));
+        let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]), Some(vec![]));
         assert_eq!(
             RepairResult::Successful,
             dotfiles
@@ -420,7 +496,7 @@ mod tests {
         let file = ".test";
         setup_content(&config, file);
         setup_symlink_wrong(&config, file);
-        let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]));
+        let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]), Some(vec![]));
         assert_eq!(
             RepairResult::Successful,
             dotfiles
@@ -437,7 +513,7 @@ mod tests {
         let file = ".test";
         setup_content(&config, file);
         setup_symlink_wrong(&config, file);
-        let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]));
+        let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]), Some(vec![]));
         assert_eq!(
             RepairResult::Skipped,
             dotfiles
