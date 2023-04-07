@@ -30,8 +30,6 @@ subcommands:
             value_name: DIR
             help: "Directory to scan for dotfiles"
             required: true
-  - watch:
-      about: "Watch for changes"
   - check:
       about: "Check consistency of dotfiles and symlinks"
       args:

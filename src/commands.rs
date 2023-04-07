@@ -1,30 +1,11 @@
-use notify::{DebouncedEvent, RecommendedWatcher, RecursiveMode, Watcher};
 use std::io;
 use std::io::Write;
 use std::path::{Component, PathBuf};
-use std::sync::mpsc::channel;
-use std::time::Duration;
 use crate::config::*;
 use crate::dotfiles::*;
-use crate::paths::*;
 use crate::util::*;
 
 pub use crate::config::init;
-
-pub fn watch(config: &PathBuf) -> Result<()> {
-    let config = Config::load(config)?;
-    let (tx, rx) = channel();
-    let mut watcher: RecommendedWatcher = Watcher::new(tx, Duration::from_secs(2))?;
-    info!("Watching file changes in target {:?}", config.target);
-    watcher.watch(config.target.clone(), RecursiveMode::Recursive)?;
-    loop {
-        let event = rx.recv()?;
-        if let DebouncedEvent::Create(created) = event {
-            let relative = relative_to(config.target.as_path(), created.as_path());
-            info!("File created: {:?}", relative)
-        }
-    }
-}
 
 pub fn list(config: &PathBuf) -> Result<()> {
     let config = Config::load(config)?;

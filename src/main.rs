@@ -7,7 +7,6 @@ extern crate failure;
 extern crate fs_extra;
 #[macro_use]
 extern crate log;
-extern crate notify;
 extern crate pretty_env_logger;
 #[macro_use]
 #[cfg(test)]
@@ -58,7 +57,6 @@ fn exec() -> Result<()> {
             matches.value_of("home").map(PathBuf::from),
             force
         ),
-        ("watch", Some(_)) => commands::watch(&config),
         ("check", Some(matches)) => commands::check(
             &config,
             matches.is_present("repair"),
