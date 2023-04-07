@@ -74,11 +74,15 @@ pub fn init(config: &PathBuf, target: &PathBuf, home: Option<PathBuf>, force: bo
 #[cfg(test)]
 pub mod test_util {
     use std::fs;
-    use tempdir::TempDir;
+    use tempfile::{Builder, TempDir};
     use crate::config::*;
 
     pub fn setup_config() -> (TempDir, Config) {
-        let dir = TempDir::new("dotfilesctl_test").unwrap();
+        let dir = Builder::new()
+            .prefix("dotfilesctl-test")
+            .rand_bytes(5)
+            .tempdir()
+            .unwrap();
         let home = dir.path().join("home");
         fs::create_dir(&home).unwrap();
         let target = dir.path().join("target");

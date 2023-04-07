@@ -12,7 +12,8 @@ extern crate pretty_env_logger;
 extern crate proptest;
 #[macro_use]
 extern crate serde_derive;
-extern crate tempdir;
+#[cfg(test)]
+extern crate tempfile;
 #[macro_use]
 extern crate thiserror;
 extern crate toml;
