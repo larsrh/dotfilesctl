@@ -21,7 +21,6 @@ subcommands:
       about: "Initialize a configuration"
       args:
         - home:
-            short: h
             long: home
             value_name: DIR
             help: "Specify home directory (default: auto-detected)"

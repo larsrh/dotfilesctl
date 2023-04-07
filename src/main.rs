@@ -1,6 +1,7 @@
 extern crate anyhow;
 #[macro_use]
 extern crate clap;
+extern crate clap_complete;
 extern crate dirs;
 extern crate env_logger;
 extern crate fs_extra;
@@ -25,7 +26,9 @@ mod dotfiles;
 mod paths;
 mod util;
 
-use clap::{App, Shell};
+use anyhow::Error;
+use clap::App;
+use clap_complete::{generate, Shell};
 use log::LevelFilter;
 use std::io;
 use std::path::PathBuf;
@@ -39,7 +42,7 @@ fn exec() -> Result<()> {
 
     let yaml = load_yaml!("../resources/cli.yml");
 
-    let cli = App::from_yaml(yaml)
+    let mut cli = App::from_yaml(yaml)
         .name(util::APP_NAME)
         .version(util::APP_VERSION);
 
@@ -52,43 +55,50 @@ fn exec() -> Result<()> {
         .ok_or(() /* dummy */)
         .or_else(|()| config::get_path())?;
 
-    match matches.subcommand() {
-        ("init", Some(matches)) => commands::init(
-            &config,
-            &PathBuf::from(matches.value_of("target").unwrap()),
-            matches.value_of("home").map(PathBuf::from),
-            force
-        ),
-        ("check", Some(matches)) => commands::check(
-            &config,
-            matches.is_present("repair"),
-            force
-        ),
-        ("completions", Some(matches)) => {
-            let shell = matches.value_of("shell").unwrap();
-            cli.clone().gen_completions_to(
-                "dotfilesctl",
-                Shell::from_str(shell).unwrap(),
-                &mut io::stdout()
-            );
-            Ok(())
+    if let Some((cmd, matches)) = matches.subcommand() {
+        match cmd {
+            "init" => commands::init(
+                &config,
+                &PathBuf::from(matches.value_of("target").unwrap()),
+                matches.value_of("home").map(PathBuf::from),
+                force
+            ),
+            "check" => commands::check(
+                &config,
+                matches.is_present("repair"),
+                force
+            ),
+            "completions" => {
+                let shell = matches.value_of("shell").unwrap();
+                generate(
+                    Shell::from_str(shell).map_err(Error::msg)?,
+                    &mut cli,
+                    "dotfilesctl",
+                    &mut io::stdout()
+                );
+                Ok(())
+            },
+            "list" => commands::list(&config),
+            "track" => commands::track(
+                &config,
+                &PathBuf::from(matches.value_of("file").unwrap()),
+                matches.is_present("skip_check"),
+                force
+            ),
+            "untrack" => commands::untrack(
+                &config,
+                &PathBuf::from(matches.value_of("file").unwrap()),
+                force
+            ),
+            _ => {
+                cli.print_help()?;
+                Ok(())
+            }
         }
-        ("list", Some(_)) => commands::list(&config),
-        ("track", Some(matches)) => commands::track(
-            &config,
-            &PathBuf::from(matches.value_of("file").unwrap()),
-            matches.is_present("skip_check"),
-            force
-        ),
-        ("untrack", Some(matches)) => commands::untrack(
-            &config,
-            &PathBuf::from(matches.value_of("file").unwrap()),
-            force
-        ),
-        _ => {
-            println!("{}", matches.usage());
-            Ok(())
-        }
+    }
+    else {
+        cli.print_help()?;
+        Ok(())
     }
 }
 
