@@ -1,4 +1,4 @@
-use failure::Error;
+use anyhow::Error;
 use std::fmt;
 use std::fmt::{Display, Formatter};
 use std::result;
@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 pub static APP_VERSION: &'static str = crate_version!();
 pub static APP_NAME: &'static str = crate_name!();
 
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub struct DotfilesError {
     pub description: String
 }

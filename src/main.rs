@@ -1,9 +1,8 @@
+extern crate anyhow;
 #[macro_use]
 extern crate clap;
 extern crate dirs;
 extern crate env_logger;
-#[macro_use]
-extern crate failure;
 extern crate fs_extra;
 #[macro_use]
 extern crate log;
@@ -14,6 +13,8 @@ extern crate proptest;
 #[macro_use]
 extern crate serde_derive;
 extern crate tempdir;
+#[macro_use]
+extern crate thiserror;
 extern crate toml;
 extern crate xdg;
 

@@ -1,4 +1,4 @@
-use failure::Error;
+use anyhow::Error;
 use fs_extra;
 use fs_extra::dir::CopyOptions;
 use std::collections::HashMap;
