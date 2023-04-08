@@ -1,9 +1,9 @@
-use std::io;
-use std::io::Write;
-use std::path::{Component, PathBuf};
 use crate::config::*;
 use crate::dotfiles::*;
 use crate::util::*;
+use std::io;
+use std::io::Write;
+use std::path::{Component, PathBuf};
 
 pub use crate::config::init;
 
@@ -47,31 +47,31 @@ pub fn check(config: &PathBuf, repair: bool, force: bool) -> Result<()> {
 
     match dotfiles.check(&config) {
         Ok(()) => info!("Checking successful!"),
-        Err(err) => if repair {
-            warn!("Found problems during checking:");
-            warn!("{}", err);
-            info!("Attempting to repair problems");
-            let result = dotfiles.repair(
-                &config,
-                if force {
-                    force_behaviour
+        Err(err) => {
+            if repair {
+                warn!("Found problems during checking:");
+                warn!("{}", err);
+                info!("Attempting to repair problems");
+                let result = dotfiles.repair(
+                    &config,
+                    if force {
+                        force_behaviour
+                    } else {
+                        ask_behaviour
+                    },
+                )?;
+                match result {
+                    RepairResult::Successful => {
+                        info!("Rechecking");
+                        dotfiles.check(&config)?
+                    }
+                    RepairResult::Skipped => {
+                        warn!("Skipped some files, problems remain")
+                    }
                 }
-                else {
-                    ask_behaviour
-                }
-            )?;
-            match result {
-                RepairResult::Successful => {
-                    info!("Rechecking");
-                    dotfiles.check(&config)?
-                },
-                RepairResult::Skipped => {
-                    warn!("Skipped some files, problems remain")
-                }
+            } else {
+                Err(err)?
             }
-        }
-        else {
-            Err(err)?
         }
     }
 
@@ -84,8 +84,7 @@ pub fn track(config: &PathBuf, file: &PathBuf, skip_check: bool, force: bool) ->
     let dotfiles = Dotfiles::load(&config)?;
     if skip_check {
         warn!("Skipping check, this is potentially dangerous")
-    }
-    else {
+    } else {
         dotfiles.check(&config)?;
     }
 
@@ -98,7 +97,7 @@ pub fn track(config: &PathBuf, file: &PathBuf, skip_check: bool, force: bool) ->
             Component::Normal(str) => {
                 let str = result_from_option(
                     str.to_str(),
-                    format!("{:?} is not a valid UTF-8 path", path)
+                    format!("{:?} is not a valid UTF-8 path", path),
                 )?;
                 if !str.starts_with('.') {
                     let msg = format!(
@@ -125,10 +124,9 @@ pub fn track(config: &PathBuf, file: &PathBuf, skip_check: bool, force: bool) ->
             file,
             if force {
                 force_behaviour
-            }
-            else {
+            } else {
                 check_behaviour
-            }
+            },
         )?
         .save(&config)?;
     Ok(())
@@ -150,7 +148,7 @@ pub fn untrack(config: &PathBuf, file: &PathBuf, force: bool) -> Result<()> {
         io::stdin().read_line(&mut buffer)?;
         match buffer.as_str().trim() {
             "y" => Ok(()),
-            _ => Err(DotfilesError::new(format!("Not deleting")))?
+            _ => Err(DotfilesError::new(format!("Not deleting")))?,
         }
     }
 
@@ -160,10 +158,9 @@ pub fn untrack(config: &PathBuf, file: &PathBuf, force: bool) -> Result<()> {
             file,
             if force {
                 force_behaviour
-            }
-            else {
+            } else {
                 ask_behaviour
-            }
+            },
         )?
         .save(&config)?;
     Ok(())

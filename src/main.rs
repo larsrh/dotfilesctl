@@ -20,8 +20,8 @@ extern crate thiserror;
 extern crate toml;
 extern crate xdg;
 
-mod config;
 mod commands;
+mod config;
 mod dotfiles;
 mod paths;
 mod util;
@@ -61,42 +61,37 @@ fn exec() -> Result<()> {
                 &config,
                 &PathBuf::from(matches.value_of("target").unwrap()),
                 matches.value_of("home").map(PathBuf::from),
-                force
+                force,
             ),
-            "check" => commands::check(
-                &config,
-                matches.is_present("repair"),
-                force
-            ),
+            "check" => commands::check(&config, matches.is_present("repair"), force),
             "completions" => {
                 let shell = matches.value_of("shell").unwrap();
                 generate(
                     Shell::from_str(shell).map_err(Error::msg)?,
                     &mut cli,
                     "dotfilesctl",
-                    &mut io::stdout()
+                    &mut io::stdout(),
                 );
                 Ok(())
-            },
+            }
             "list" => commands::list(&config),
             "track" => commands::track(
                 &config,
                 &PathBuf::from(matches.value_of("file").unwrap()),
                 matches.is_present("skip_check"),
-                force
+                force,
             ),
             "untrack" => commands::untrack(
                 &config,
                 &PathBuf::from(matches.value_of("file").unwrap()),
-                force
+                force,
             ),
             _ => {
                 cli.print_help()?;
                 Ok(())
             }
         }
-    }
-    else {
+    } else {
         cli.print_help()?;
         Ok(())
     }
@@ -105,6 +100,6 @@ fn exec() -> Result<()> {
 fn main() {
     match exec() {
         Ok(()) => (),
-        Err(err) => error!("{}", err)
+        Err(err) => error!("{}", err),
     }
 }

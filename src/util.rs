@@ -9,7 +9,7 @@ pub static APP_NAME: &'static str = crate_name!();
 
 #[derive(Debug, Error)]
 pub struct DotfilesError {
-    pub description: String
+    pub description: String,
 }
 
 impl Display for DotfilesError {
@@ -40,13 +40,13 @@ pub fn is_unique<T: Ord + Clone>(vec: &Vec<T>) -> bool {
 }
 
 pub fn unexpected_files(dir: &Path, files: &Vec<PathBuf>, expect_exists: bool) -> Vec<PathBuf> {
-    files.iter()
+    files
+        .iter()
         .filter_map(|file| {
             let expected = dir.join(file);
             if expected.exists() == expect_exists {
                 None
-            }
-            else {
+            } else {
                 Some(file.clone())
             }
         })
@@ -64,5 +64,4 @@ mod test {
         assert!(!is_unique(&vec![1, 2, 2]));
         assert!(!is_unique(&vec![2, 1, 2]));
     }
-
 }

@@ -4,8 +4,7 @@ pub fn relative_to(from: &Path, to: &Path) -> PathBuf {
     fn go(buf: &mut PathBuf, from: &Path, to: &Path) {
         if to.starts_with(from) {
             buf.push(to.strip_prefix(from).unwrap());
-        }
-        else {
+        } else {
             buf.push("..");
             go(buf, from.parent().unwrap(), to)
         }
@@ -25,11 +24,12 @@ pub fn canonicalize_light<P: AsRef<Path>>(path: P) -> PathBuf {
                 buf.push(PathBuf::from(component.as_os_str()))
             }
             Component::CurDir => {}
-            Component::ParentDir => if buf.file_name().is_none() {
-                buf.push(PathBuf::from(component.as_os_str()));
-            }
-            else {
-                buf.pop();
+            Component::ParentDir => {
+                if buf.file_name().is_none() {
+                    buf.push(PathBuf::from(component.as_os_str()));
+                } else {
+                    buf.pop();
+                }
             }
         };
     }
@@ -38,8 +38,8 @@ pub fn canonicalize_light<P: AsRef<Path>>(path: P) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
     use crate::paths::*;
+    use std::path::Path;
 
     fn assert_relative_to(from: &str, to: &str, res: &str) {
         let from = Path::new(from);

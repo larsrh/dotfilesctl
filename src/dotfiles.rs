@@ -1,3 +1,6 @@
+use crate::config::*;
+use crate::paths;
+use crate::util::*;
 use anyhow::Error;
 use fs_extra;
 use fs_extra::dir::CopyOptions;
@@ -10,32 +13,29 @@ use std::path::{Path, PathBuf};
 use std::vec::Vec;
 use toml;
 use toml::Value;
-use crate::config::*;
-use crate::paths;
-use crate::util::*;
 
 pub enum SymlinkStatus {
     Ok,
     Absent(Error),
-    Wrong
+    Wrong,
 }
 
 pub enum RepairAction {
     Skip,
-    Delete
+    Delete,
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum RepairResult {
     Successful,
-    Skipped
+    Skipped,
 }
 
 impl RepairResult {
     pub fn coalesce(self: RepairResult, that: &RepairResult) -> RepairResult {
         match self {
             RepairResult::Skipped => RepairResult::Skipped,
-            _ => that.clone()
+            _ => that.clone(),
         }
     }
 
@@ -49,7 +49,7 @@ impl RepairResult {
 pub struct Symlink {
     pub expected: PathBuf,
     pub path: PathBuf,
-    pub status: SymlinkStatus
+    pub status: SymlinkStatus,
 }
 
 impl Symlink {
@@ -57,7 +57,7 @@ impl Symlink {
         Symlink {
             expected,
             path,
-            status
+            status,
         }
     }
 
@@ -71,14 +71,13 @@ impl Symlink {
                     symlink,
                     if expected == actual {
                         SymlinkStatus::Ok
-                    }
-                    else {
+                    } else {
                         SymlinkStatus::Wrong
-                    }
+                    },
                 ),
-                Err(_) => Symlink::new(expected, symlink, SymlinkStatus::Wrong)
+                Err(_) => Symlink::new(expected, symlink, SymlinkStatus::Wrong),
             },
-            Err(err) => Symlink::new(expected, symlink, SymlinkStatus::Absent(Error::from(err)))
+            Err(err) => Symlink::new(expected, symlink, SymlinkStatus::Absent(Error::from(err))),
         }
     }
 
@@ -90,7 +89,7 @@ impl Symlink {
 
     pub fn repair(
         &self,
-        wrong_behaviour: fn(&PathBuf) -> Result<RepairAction>
+        wrong_behaviour: fn(&PathBuf) -> Result<RepairAction>,
     ) -> Result<RepairResult> {
         let result = match self.status {
             SymlinkStatus::Wrong => {
@@ -112,7 +111,7 @@ impl Symlink {
                 self.create()?;
                 RepairResult::Successful
             }
-            SymlinkStatus::Ok => RepairResult::Successful
+            SymlinkStatus::Ok => RepairResult::Successful,
         };
 
         Ok(result)
@@ -180,8 +179,7 @@ impl Dotfiles {
         if let Some(table) = toml.as_table() {
             let version = if let Some(value) = table.get("version") {
                 value.clone().try_into::<i64>()?
-            }
-            else {
+            } else {
                 // use initial version that had no version tag
                 1
             };
@@ -197,8 +195,7 @@ impl Dotfiles {
                     Err(err)?
                 }
             }
-        }
-        else {
+        } else {
             let msg = format!("Expected table, got {:?}", toml.type_str());
             let err = DotfilesError::new(msg);
             Err(err)?
@@ -226,7 +223,7 @@ impl Dotfiles {
             Err(err)?
         }
 
-        if let Some(f) = files.iter().find(|f| { deleted.contains(f) }) {
+        if let Some(f) = files.iter().find(|f| deleted.contains(f)) {
             let msg = format!("File {:?} is both listed and deleted", f);
             let err = DotfilesError::new(msg);
             Err(err)?
@@ -238,8 +235,7 @@ impl Dotfiles {
         let absent_contents = self.get_absent_files(config.contents().as_path());
         if absent_contents.is_empty() {
             info!("No absent content.")
-        }
-        else {
+        } else {
             let msg = format!("Absent content: {:?}", absent_contents);
             let err = DotfilesError::new(msg);
             Err(err)?
@@ -249,8 +245,7 @@ impl Dotfiles {
         let spurious_contents = self.get_spurious_files(config.contents().as_path());
         if spurious_contents.is_empty() {
             info!("No spurious content.")
-        }
-        else {
+        } else {
             let msg = format!("Spurious content: {:?}", spurious_contents);
             let err = DotfilesError::new(msg);
             Err(err)?
@@ -276,7 +271,7 @@ impl Dotfiles {
                     );
                     Err(DotfilesError::new(msg))?
                 }
-                SymlinkStatus::Ok => ()
+                SymlinkStatus::Ok => (),
             }
         }
         info!("{} symlink(s) correct.", symlinks.len());
@@ -288,7 +283,7 @@ impl Dotfiles {
         &self,
         config: &Config,
         file: &PathBuf,
-        validate_relative: fn(&PathBuf) -> Result<()>
+        validate_relative: fn(&PathBuf) -> Result<()>,
     ) -> Result<Dotfiles> {
         let file_type = file.symlink_metadata()?.file_type();
         if file_type.is_symlink() {
@@ -321,8 +316,7 @@ impl Dotfiles {
 
         if file_type.is_file() {
             info!("Tracking {:?}", relative);
-        }
-        else {
+        } else {
             info!("Tracking {:?} and all its children", relative);
         }
 
@@ -343,7 +337,7 @@ impl Dotfiles {
         &self,
         config: &Config,
         file: &PathBuf,
-        confirm_delete: fn(&PathBuf) -> Result<()>
+        confirm_delete: fn(&PathBuf) -> Result<()>,
     ) -> Result<Dotfiles> {
         let home = config.get_home()?;
         if !file.starts_with(home.clone()) {
@@ -362,7 +356,10 @@ impl Dotfiles {
             Err(DotfilesError::new(msg))?
         }
         if deleted.contains(&relative) {
-            let msg = format!("Cannot untrack {:?} because it has already been deleted", relative);
+            let msg = format!(
+                "Cannot untrack {:?} because it has already been deleted",
+                relative
+            );
             Err(DotfilesError::new(msg))?
         }
 
@@ -383,15 +380,14 @@ impl Dotfiles {
     pub fn repair(
         &self,
         config: &Config,
-        wrong_behaviour: fn(&PathBuf) -> Result<RepairAction>
+        wrong_behaviour: fn(&PathBuf) -> Result<RepairAction>,
     ) -> Result<RepairResult> {
         let home = config.get_home()?;
         info!("Attempting to repair broken symlinks in {:?}", home);
 
         let symlinks = self.get_symlinks(config.contents().as_path(), home.as_path());
 
-        // Rust type inference weirdness
-        let skippeds: Result<Vec<_>> = symlinks
+        let skippeds: Result<_> = symlinks
             .values()
             .map(|symlink| symlink.repair(wrong_behaviour))
             .collect();

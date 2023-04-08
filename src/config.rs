@@ -1,15 +1,15 @@
+use crate::util::*;
 use dirs;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use toml;
 use xdg::BaseDirectories;
-use crate::util::*;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Config {
     pub target: PathBuf,
-    home: Option<PathBuf>
+    home: Option<PathBuf>,
 }
 
 impl Config {
@@ -54,16 +54,14 @@ pub fn init(config: &PathBuf, target: &PathBuf, home: Option<PathBuf>, force: bo
     if !target.is_dir() {
         let err = DotfilesError::new(format!("{:?} is not a directory", target));
         Err(err)?
-    }
-    else {
+    } else {
         let target = target.canonicalize()?;
         info!("Installing a fresh config in {:?}", config);
         if !config.is_file() || force {
             let contents = toml::to_string(&Config::new(target, home))?;
             File::create(config)?.write_all(contents.as_bytes())?;
             Ok(())
-        }
-        else {
+        } else {
             let msg = format!("{:?} exists but --force has not been specified", config);
             let err = DotfilesError::new(msg);
             Err(err)?
@@ -73,9 +71,9 @@ pub fn init(config: &PathBuf, target: &PathBuf, home: Option<PathBuf>, force: bo
 
 #[cfg(test)]
 pub mod test_util {
+    use crate::config::*;
     use std::fs;
     use tempfile::{Builder, TempDir};
-    use crate::config::*;
 
     pub fn setup_config() -> (TempDir, Config) {
         let dir = Builder::new()
