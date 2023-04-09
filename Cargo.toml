@@ -1,6 +1,6 @@
 [package]
 name = "dotfilesctl"
-edition = "2018"
+edition = "2021"
 version = "0.2.1-alpha.0"
 authors = ["Lars Hupel <lars@hupel.info>"]
 repository = "https://github.com/larsrh/dotfilesctl"

@@ -1,6 +1,7 @@
 use crate::config::*;
 use crate::dotfiles::*;
 use crate::util::*;
+use anyhow::Result;
 use std::io;
 use std::io::Write;
 use std::path::{Component, PathBuf};
@@ -148,7 +149,7 @@ pub fn untrack(config: &PathBuf, file: &PathBuf, force: bool) -> Result<()> {
         io::stdin().read_line(&mut buffer)?;
         match buffer.as_str().trim() {
             "y" => Ok(()),
-            _ => Err(DotfilesError::new(format!("Not deleting")))?,
+            _ => Err(DotfilesError::new("Not deleting".to_string()))?,
         }
     }
 

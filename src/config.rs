@@ -1,9 +1,8 @@
 use crate::util::*;
-use dirs;
+use anyhow::Result;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::PathBuf;
-use toml;
 use xdg::BaseDirectories;
 
 #[derive(Debug, Deserialize, Serialize)]

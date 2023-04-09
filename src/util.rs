@@ -1,11 +1,10 @@
-use anyhow::Error;
+use anyhow::Result;
 use std::fmt;
 use std::fmt::{Display, Formatter};
-use std::result;
 use std::path::{Path, PathBuf};
 
-pub static APP_VERSION: &'static str = crate_version!();
-pub static APP_NAME: &'static str = crate_name!();
+pub static APP_VERSION: &str = crate_version!();
+pub static APP_NAME: &str = crate_name!();
 
 #[derive(Debug, Error)]
 pub struct DotfilesError {
@@ -25,8 +24,6 @@ impl DotfilesError {
     }
 }
 
-pub type Result<T> = result::Result<T, Error>;
-
 pub fn result_from_option<T>(opt: Option<T>, msg: String) -> Result<T> {
     let t = opt.ok_or_else(|| DotfilesError::new(msg))?;
     Ok(t)
@@ -39,7 +36,7 @@ pub fn is_unique<T: Ord + Clone>(vec: &Vec<T>) -> bool {
     vec2.len() == vec.len()
 }
 
-pub fn unexpected_files(dir: &Path, files: &Vec<PathBuf>, expect_exists: bool) -> Vec<PathBuf> {
+pub fn unexpected_files(dir: &Path, files: &[PathBuf], expect_exists: bool) -> Vec<PathBuf> {
     files
         .iter()
         .filter_map(|file| {

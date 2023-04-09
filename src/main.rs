@@ -1,3 +1,4 @@
+#[macro_use]
 extern crate anyhow;
 #[macro_use]
 extern crate clap;
@@ -26,14 +27,13 @@ mod dotfiles;
 mod paths;
 mod util;
 
-use anyhow::Error;
+use anyhow::{Error, Result};
 use clap::App;
 use clap_complete::{generate, Shell};
 use log::LevelFilter;
 use std::io;
 use std::path::PathBuf;
 use std::str::FromStr;
-use util::*;
 
 fn exec() -> Result<()> {
     let mut builder = pretty_env_logger::formatted_builder();

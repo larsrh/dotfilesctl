@@ -1,8 +1,7 @@
 use crate::config::*;
 use crate::paths;
 use crate::util::*;
-use anyhow::Error;
-use fs_extra;
+use anyhow::{Error, Result};
 use fs_extra::dir::CopyOptions;
 use std::collections::HashMap;
 use std::fs;
@@ -11,7 +10,6 @@ use std::io::{Read, Write};
 use std::os::unix::fs as unix;
 use std::path::{Path, PathBuf};
 use std::vec::Vec;
-use toml;
 use toml::Value;
 
 pub enum SymlinkStatus {
@@ -144,7 +142,7 @@ impl Dotfiles {
     pub fn get_deleted(&self) -> Vec<PathBuf> {
         match self.deleted {
             Some(ref deleted) => deleted.clone(),
-            None => vec![]
+            None => vec![],
         }
     }
 
@@ -218,9 +216,7 @@ impl Dotfiles {
         let files = self.get_files();
         let deleted = self.get_deleted();
         if !is_unique(&files) || !is_unique(&deleted) {
-            let msg = format!("Duplicate files");
-            let err = DotfilesError::new(msg);
-            Err(err)?
+            Err(DotfilesError::new("Duplicate files".to_string()))?
         }
 
         if let Some(f) = files.iter().find(|f| deleted.contains(f)) {
@@ -325,7 +321,7 @@ impl Dotfiles {
         let content_path = dest.clone();
         dest.pop();
         fs::create_dir_all(dest.clone())?;
-        fs_extra::move_items(&vec![file.clone()], dest, &CopyOptions::new())?;
+        fs_extra::move_items(&[file.clone()], dest, &CopyOptions::new())?;
 
         unix::symlink(content_path, file)?;
 
@@ -350,7 +346,7 @@ impl Dotfiles {
 
         let mut files = self.get_files();
         let mut deleted = self.get_deleted();
-        let relative = paths::relative_to(&home, &file);
+        let relative = paths::relative_to(&home, file);
         if !files.contains(&relative) {
             let msg = format!("Cannot untrack {:?} because it is not tracked", relative);
             Err(DotfilesError::new(msg))?
@@ -369,7 +365,7 @@ impl Dotfiles {
         confirm_delete(&dest)?;
         fs::remove_file(dest)?;
 
-        confirm_delete(&file)?;
+        confirm_delete(file)?;
         fs::remove_file(file)?;
 
         files.remove(files.iter().position(|file| *file == relative).unwrap());
