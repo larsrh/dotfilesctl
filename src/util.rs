@@ -1,31 +1,10 @@
 use crate::perm::{Perm, Perms};
-use anyhow::Result;
-use std::fmt;
-use std::fmt::{Display, Formatter};
+use anyhow::{Error, Result};
 use std::fs;
 use std::path::{Path, PathBuf};
 
 pub static APP_VERSION: &str = crate_version!();
 pub static APP_NAME: &str = crate_name!();
-
-// TODO replace with anyhow
-#[derive(Debug, Error)]
-pub struct DotfilesError {
-    pub description: String,
-}
-
-impl Display for DotfilesError {
-    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        // Use `self.number` to refer to each positional data point.
-        write!(f, "{}", self.description)
-    }
-}
-
-impl DotfilesError {
-    pub fn new(description: String) -> DotfilesError {
-        DotfilesError { description }
-    }
-}
 
 pub fn remove_item<T: Eq>(vec: &mut Vec<T>, item: &T) {
     if let Some(pos) = vec.iter().position(|x| *x == *item) {
@@ -34,8 +13,7 @@ pub fn remove_item<T: Eq>(vec: &mut Vec<T>, item: &T) {
 }
 
 pub fn result_from_option<T>(opt: Option<T>, msg: String) -> Result<T> {
-    let t = opt.ok_or_else(|| DotfilesError::new(msg))?;
-    Ok(t)
+    opt.ok_or_else(|| Error::msg(msg))
 }
 
 pub fn is_unique<T: Ord + Clone>(vec: &Vec<T>) -> bool {

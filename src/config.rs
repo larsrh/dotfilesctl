@@ -26,10 +26,9 @@ impl Config {
     pub fn get_home(&self) -> Result<PathBuf> {
         let path = match self.home.clone().or_else(dirs::home_dir) {
             Some(home) => Ok(home),
-            None => {
-                let msg = "No home directory configured and none could be detected";
-                Err(DotfilesError::new(msg.to_string()))
-            }
+            None => Err(anyhow!(
+                "No home directory configured and none could be detected"
+            )),
         }?;
         Ok(path)
     }
@@ -51,8 +50,7 @@ pub fn get_path() -> Result<PathBuf> {
 
 pub fn init(config: &PathBuf, target: &PathBuf, home: Option<PathBuf>, force: bool) -> Result<()> {
     if !target.is_dir() {
-        let err = DotfilesError::new(format!("{:?} is not a directory", target));
-        Err(err)?
+        Err(anyhow!("{:?} is not a directory", target))?
     } else {
         let target = target.canonicalize()?;
         info!("Installing a fresh config in {:?}", config);
@@ -61,9 +59,10 @@ pub fn init(config: &PathBuf, target: &PathBuf, home: Option<PathBuf>, force: bo
             File::create(config)?.write_all(contents.as_bytes())?;
             Ok(())
         } else {
-            let msg = format!("{:?} exists but --force has not been specified", config);
-            let err = DotfilesError::new(msg);
-            Err(err)?
+            Err(anyhow!(
+                "{:?} exists but --force has not been specified",
+                config
+            ))?
         }
     }
 }

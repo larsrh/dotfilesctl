@@ -39,10 +39,7 @@ pub fn check(config: &PathBuf, repair: bool, force: bool) -> Result<()> {
         match buffer.as_str().trim() {
             "" | "N" => Ok(RepairAction::Skip),
             "y" => Ok(RepairAction::Delete),
-            _ => {
-                let msg = format!("Invalid answer: {}", buffer);
-                Err(DotfilesError::new(msg))?
-            }
+            _ => Err(anyhow!("Invalid answer: {}", buffer))?,
         }
     }
 
@@ -101,20 +98,16 @@ pub fn track(config: &PathBuf, file: &PathBuf, skip_check: bool, force: bool) ->
                     format!("{:?} is not a valid UTF-8 path", path),
                 )?;
                 if !str.starts_with('.') {
-                    let msg = format!(
+                    Err(anyhow!(
                         "Only dotfiles can be tracked, {:?} does not start with a dot",
                         path
-                    );
-                    Err(DotfilesError::new(msg))?
+                    ))?
                 }
             }
-            _ => {
-                let msg = format!(
-                    "Only dotfiles can be tracked, {:?} does not start with a normal path component",
-                    path
-                );
-                Err(DotfilesError::new(msg))?
-            }
+            _ => Err(anyhow!(
+                "Only dotfiles can be tracked, {:?} does not start with a normal path component",
+                path
+            ))?,
         };
         Ok(())
     }
@@ -149,7 +142,7 @@ pub fn untrack(config: &PathBuf, file: &PathBuf, force: bool) -> Result<()> {
         io::stdin().read_line(&mut buffer)?;
         match buffer.as_str().trim() {
             "y" => Ok(()),
-            _ => Err(DotfilesError::new("Not deleting".to_string()))?,
+            _ => Err(anyhow!("Not deleting"))?,
         }
     }
 

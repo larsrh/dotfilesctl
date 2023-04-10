@@ -16,8 +16,6 @@ extern crate proptest;
 extern crate serde_derive;
 #[cfg(test)]
 extern crate tempfile;
-#[macro_use]
-extern crate thiserror;
 extern crate toml;
 extern crate xdg;
 

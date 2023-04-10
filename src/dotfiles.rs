@@ -215,14 +215,10 @@ impl Dotfiles {
                     let dotfiles = toml.clone().try_into::<Dotfiles>()?;
                     Ok(dotfiles)
                 }
-                _ => {
-                    let msg = format!("Invalid version number {:?}", version);
-                    Err(DotfilesError::new(msg))?
-                }
+                _ => Err(anyhow!("Invalid version number {:?}", version))?,
             }
         } else {
-            let msg = format!("Expected table, got {:?}", toml.type_str());
-            Err(DotfilesError::new(msg))?
+            Err(anyhow!("Expected table, got {:?}", toml.type_str()))?
         }
     }
 
@@ -243,16 +239,14 @@ impl Dotfiles {
         let deleted = self.get_deleted();
         let executables = self.get_executables();
         if !is_unique(&files) || !is_unique(&deleted) || !is_unique(&executables) {
-            Err(DotfilesError::new("Duplicate files".to_string()))?
+            Err(anyhow!("Duplicate files"))?
         }
 
         if let Some(f) = files.iter().find(|f| deleted.contains(f)) {
-            let msg = format!("File {:?} is both listed and deleted", f);
-            Err(DotfilesError::new(msg))?
+            Err(anyhow!("File {:?} is both listed and deleted", f))?
         }
         if let Some(f) = executables.iter().find(|f| !files.contains(f)) {
-            let msg = format!("Unknown file {:?} is marked executable", f);
-            Err(DotfilesError::new(msg))?
+            Err(anyhow!("Unknown file {:?} is marked executable", f))?
         }
 
         info!("Consistent.");
@@ -262,8 +256,7 @@ impl Dotfiles {
         if absent_contents.is_empty() {
             info!("No absent content.")
         } else {
-            let msg = format!("Absent content: {:?}", absent_contents);
-            Err(DotfilesError::new(msg))?
+            Err(anyhow!("Absent content: {:?}", absent_contents))?
         }
 
         info!("Checking for spurious content in {:?}", config.contents());
@@ -271,8 +264,7 @@ impl Dotfiles {
         if spurious_contents.is_empty() {
             info!("No spurious content.")
         } else {
-            let msg = format!("Spurious content: {:?}", spurious_contents);
-            Err(DotfilesError::new(msg))?
+            Err(anyhow!("Spurious content: {:?}", spurious_contents))?
         }
 
         let home = config.get_home()?;
@@ -280,38 +272,33 @@ impl Dotfiles {
         let symlinks = self.get_symlinks(config.contents().as_path(), home.as_path());
         for (dotfile, symlink) in &symlinks {
             match symlink.status {
-                SymlinkStatus::Wrong => {
-                    let msg = format!(
-                        "{:?} is not a symlink or symlink with wrong target, expected: {:?}",
-                        dotfile, symlink.expected
-                    );
-                    Err(DotfilesError::new(msg))?
-                }
-                SymlinkStatus::Absent(ref err) => {
-                    let msg = format!(
-                        "{:?} does not exist, expected symbolic link to {:?} ({:?})",
-                        dotfile, symlink.expected, err
-                    );
-                    Err(DotfilesError::new(msg))?
-                }
+                SymlinkStatus::Wrong => Err(anyhow!(
+                    "{:?} is not a symlink or symlink with wrong target, expected: {:?}",
+                    dotfile,
+                    symlink.expected
+                ))?,
+                SymlinkStatus::Absent(ref err) => Err(anyhow!(
+                    "{:?} does not exist, expected symbolic link to {:?} ({:?})",
+                    dotfile,
+                    symlink.expected,
+                    err
+                ))?,
                 SymlinkStatus::Ok => {
                     // now let's see if we're pointing to a file to check executability
                     if symlink.expected.is_file() {
                         let actual = Executable::get(&symlink.expected)?;
                         let expected = Executable::from(executables.contains(dotfile));
                         if actual != expected {
-                            let msg = format!(
+                            Err(anyhow!(
                                 "Executable flag mismatch: expected {:?} as {:?}, but actually is {:?}",
                                 symlink.expected, expected, actual
-                            );
-                            Err(DotfilesError::new(msg))?
+                            ))?
                         }
                     } else if symlink.expected.is_dir() && executables.contains(dotfile) {
-                        let msg = format!(
-                                "Executable flag set for {:?}, which is a directory. Directories are executable by default",
-                                symlink.expected
-                            );
-                        Err(DotfilesError::new(msg))?
+                        Err(anyhow!(
+                            "Executable flag set for {:?}, which is a directory. Directories are executable by default",
+                            symlink.expected
+                        ))?
                     }
                 }
             }
@@ -329,32 +316,35 @@ impl Dotfiles {
     ) -> Result<Dotfiles> {
         let file_type = file.symlink_metadata()?.file_type();
         if file_type.is_symlink() {
-            let msg = format!("Cannot track {:?} because it is a symlink", file);
-            Err(DotfilesError::new(msg))?
+            Err(anyhow!("Cannot track {:?} because it is a symlink", file))?
         }
 
         let file = file.canonicalize()?;
         let home = config.get_home()?;
         if !file.starts_with(home.clone()) {
-            let msg = format!(
+            Err(anyhow!(
                 "Cannot track {:?} because it is not in the home directory {:?}",
-                file, home
-            );
-            Err(DotfilesError::new(msg))?
+                file,
+                home
+            ))?
         }
 
         let mut files = self.get_files();
         let relative = paths::relative_to(&home, &file);
         validate_relative(&relative)?;
         if files.contains(&relative) {
-            let msg = format!("Cannot track {:?} because it is already tracked", file);
-            Err(DotfilesError::new(msg))?
+            Err(anyhow!(
+                "Cannot track {:?} because it is already tracked",
+                file
+            ))?
         }
 
         let deleted = self.get_deleted();
         if deleted.contains(&relative) {
-            let msg = format!("Cannot track {:?} because it has been deleted", file);
-            Err(DotfilesError::new(msg))?
+            Err(anyhow!(
+                "Cannot track {:?} because it has been deleted",
+                file
+            ))?
         }
 
         if file_type.is_file() {
@@ -388,27 +378,28 @@ impl Dotfiles {
     ) -> Result<Dotfiles> {
         let home = config.get_home()?;
         if !file.starts_with(home.clone()) {
-            let msg = format!(
+            Err(anyhow!(
                 "Cannot untrack {:?} because it is not in the home directory {:?}",
-                file, home
-            );
-            Err(DotfilesError::new(msg))?
+                file,
+                home
+            ))?
         }
 
         let mut files = self.get_files();
         let relative = paths::relative_to(&home, file);
         if !files.contains(&relative) {
-            let msg = format!("Cannot untrack {:?} because it is not tracked", relative);
-            Err(DotfilesError::new(msg))?
+            Err(anyhow!(
+                "Cannot untrack {:?} because it is not tracked",
+                relative
+            ))?
         }
 
         let mut deleted = self.get_deleted();
         if deleted.contains(&relative) {
-            let msg = format!(
+            Err(anyhow!(
                 "Cannot untrack {:?} because it has already been deleted",
                 relative
-            );
-            Err(DotfilesError::new(msg))?
+            ))?
         }
 
         let mut dest = config.contents();
@@ -437,21 +428,19 @@ impl Dotfiles {
     ) -> Result<Dotfiles> {
         let home = config.get_home()?;
         if !file.starts_with(home.clone()) {
-            let msg = format!(
+            Err(anyhow!(
                 "Cannot modify executable flag of {:?} because it is not in the home directory {:?}",
                 file, home
-            );
-            Err(DotfilesError::new(msg))?
+            ))?
         }
 
         let files = self.get_files();
         let relative = paths::relative_to(&home, file);
         if !files.contains(&relative) {
-            let msg = format!(
+            Err(anyhow!(
                 "Cannot modify executable flag of {:?} because it is not tracked",
                 relative
-            );
-            Err(DotfilesError::new(msg))?
+            ))?
         }
 
         let mut executables = self.get_executables();
