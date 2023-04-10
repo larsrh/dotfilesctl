@@ -62,6 +62,20 @@ subcommands:
             help: "Path to the tracked dotfile"
             takes_value: true
             required: true
+  - executable:
+      about: "Modify executable flag of a tracked dotfile"
+      args:
+        - file:
+            value_name: FILE
+            help: "Path to the existing dotfile"
+            takes_value: true
+            required: true
+        - mode:
+            value_name: BOOL
+            help: "Executable? (default: true)"
+            takes_value: true
+            required: false
+            possible_values: ["true", "false"]
   - completions:
       about: "Generates completion scripts for your shell"
       args:

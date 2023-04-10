@@ -25,6 +25,7 @@ mod commands;
 mod config;
 mod dotfiles;
 mod paths;
+mod perm;
 mod util;
 
 use anyhow::{Error, Result};
@@ -85,6 +86,14 @@ fn exec() -> Result<()> {
                 &config,
                 &PathBuf::from(matches.value_of("file").unwrap()),
                 force,
+            ),
+            "executable" => commands::set_executable(
+                &config,
+                &PathBuf::from(matches.value_of("file").unwrap()),
+                match matches.value_of("mode") {
+                    None | Some("true") => util::Executable::Yes,
+                    _ => util::Executable::No,
+                },
             ),
             _ => {
                 cli.print_help()?;

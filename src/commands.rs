@@ -166,3 +166,13 @@ pub fn untrack(config: &PathBuf, file: &PathBuf, force: bool) -> Result<()> {
         .save(&config)?;
     Ok(())
 }
+
+pub fn set_executable(config: &PathBuf, file: &PathBuf, mode: Executable) -> Result<()> {
+    let config = Config::load(config)?;
+    let dotfiles = Dotfiles::load(&config)?;
+    dotfiles.check(&config)?;
+    dotfiles
+        .set_executable(&config, file, mode)?
+        .save(&config)?;
+    Ok(())
+}

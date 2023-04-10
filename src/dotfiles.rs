@@ -88,6 +88,7 @@ impl Symlink {
     pub fn repair(
         &self,
         wrong_behaviour: fn(&PathBuf) -> Result<RepairAction>,
+        mode: Executable,
     ) -> Result<RepairResult> {
         let result = match self.status {
             SymlinkStatus::Wrong => {
@@ -109,10 +110,20 @@ impl Symlink {
                 self.create()?;
                 RepairResult::Successful
             }
-            SymlinkStatus::Ok => RepairResult::Successful,
+            SymlinkStatus::Ok => {
+                self.set_executable(mode)?;
+                RepairResult::Successful
+            }
         };
 
         Ok(result)
+    }
+
+    pub fn set_executable(&self, mode: Executable) -> Result<()> {
+        if self.expected.is_file() {
+            mode.set(&self.expected)?
+        }
+        Ok(())
     }
 }
 
@@ -120,22 +131,35 @@ impl Symlink {
 pub struct Dotfiles {
     version: Option<i64>, // always 1
     files: Option<Vec<PathBuf>>,
-    deleted: Option<Vec<PathBuf>>
+    executables: Option<Vec<PathBuf>>,
+    deleted: Option<Vec<PathBuf>>,
 }
 
 impl Dotfiles {
-    pub fn new(files: Option<Vec<PathBuf>>, deleted: Option<Vec<PathBuf>>) -> Dotfiles {
+    pub fn new(
+        files: Option<Vec<PathBuf>>,
+        executables: Option<Vec<PathBuf>>,
+        deleted: Option<Vec<PathBuf>>,
+    ) -> Dotfiles {
         Dotfiles {
             files,
             deleted,
-            version: Some(1)
+            executables,
+            version: Some(1),
         }
     }
 
     pub fn get_files(&self) -> Vec<PathBuf> {
         match self.files {
             Some(ref files) => files.clone(),
-            None => vec![]
+            None => vec![],
+        }
+    }
+
+    pub fn get_executables(&self) -> Vec<PathBuf> {
+        match self.executables {
+            Some(ref executables) => executables.clone(),
+            None => vec![],
         }
     }
 
@@ -147,7 +171,11 @@ impl Dotfiles {
     }
 
     pub fn canonicalize(&self) -> Dotfiles {
-        Dotfiles::new(Some(self.get_files()), Some(self.get_deleted()))
+        Dotfiles::new(
+            Some(self.get_files()),
+            Some(self.get_executables()),
+            Some(self.get_deleted()),
+        )
     }
 
     pub fn get_absent_files(&self, contents: &Path) -> Vec<PathBuf> {
@@ -189,14 +217,12 @@ impl Dotfiles {
                 }
                 _ => {
                     let msg = format!("Invalid version number {:?}", version);
-                    let err = DotfilesError::new(msg);
-                    Err(err)?
+                    Err(DotfilesError::new(msg))?
                 }
             }
         } else {
             let msg = format!("Expected table, got {:?}", toml.type_str());
-            let err = DotfilesError::new(msg);
-            Err(err)?
+            Err(DotfilesError::new(msg))?
         }
     }
 
@@ -215,14 +241,18 @@ impl Dotfiles {
         info!("Checking consistency");
         let files = self.get_files();
         let deleted = self.get_deleted();
-        if !is_unique(&files) || !is_unique(&deleted) {
+        let executables = self.get_executables();
+        if !is_unique(&files) || !is_unique(&deleted) || !is_unique(&executables) {
             Err(DotfilesError::new("Duplicate files".to_string()))?
         }
 
         if let Some(f) = files.iter().find(|f| deleted.contains(f)) {
             let msg = format!("File {:?} is both listed and deleted", f);
-            let err = DotfilesError::new(msg);
-            Err(err)?
+            Err(DotfilesError::new(msg))?
+        }
+        if let Some(f) = executables.iter().find(|f| !files.contains(f)) {
+            let msg = format!("Unknown file {:?} is marked executable", f);
+            Err(DotfilesError::new(msg))?
         }
 
         info!("Consistent.");
@@ -233,8 +263,7 @@ impl Dotfiles {
             info!("No absent content.")
         } else {
             let msg = format!("Absent content: {:?}", absent_contents);
-            let err = DotfilesError::new(msg);
-            Err(err)?
+            Err(DotfilesError::new(msg))?
         }
 
         info!("Checking for spurious content in {:?}", config.contents());
@@ -243,12 +272,11 @@ impl Dotfiles {
             info!("No spurious content.")
         } else {
             let msg = format!("Spurious content: {:?}", spurious_contents);
-            let err = DotfilesError::new(msg);
-            Err(err)?
+            Err(DotfilesError::new(msg))?
         }
 
         let home = config.get_home()?;
-        info!("Checking for symlinks in {:?}", home);
+        info!("Checking for symlinks and executable flag in {:?}", home);
         let symlinks = self.get_symlinks(config.contents().as_path(), home.as_path());
         for (dotfile, symlink) in &symlinks {
             match symlink.status {
@@ -257,8 +285,7 @@ impl Dotfiles {
                         "{:?} is not a symlink or symlink with wrong target, expected: {:?}",
                         dotfile, symlink.expected
                     );
-                    let err = DotfilesError::new(msg);
-                    Err(err)?
+                    Err(DotfilesError::new(msg))?
                 }
                 SymlinkStatus::Absent(ref err) => {
                     let msg = format!(
@@ -267,7 +294,26 @@ impl Dotfiles {
                     );
                     Err(DotfilesError::new(msg))?
                 }
-                SymlinkStatus::Ok => (),
+                SymlinkStatus::Ok => {
+                    // now let's see if we're pointing to a file to check executability
+                    if symlink.expected.is_file() {
+                        let actual = Executable::get(&symlink.expected)?;
+                        let expected = Executable::from(executables.contains(dotfile));
+                        if actual != expected {
+                            let msg = format!(
+                                "Executable flag mismatch: expected {:?} as {:?}, but actually is {:?}",
+                                symlink.expected, expected, actual
+                            );
+                            Err(DotfilesError::new(msg))?
+                        }
+                    } else if symlink.expected.is_dir() && executables.contains(dotfile) {
+                        let msg = format!(
+                                "Executable flag set for {:?}, which is a directory. Directories are executable by default",
+                                symlink.expected
+                            );
+                        Err(DotfilesError::new(msg))?
+                    }
+                }
             }
         }
         info!("{} symlink(s) correct.", symlinks.len());
@@ -298,13 +344,14 @@ impl Dotfiles {
         }
 
         let mut files = self.get_files();
-        let deleted = self.get_deleted();
         let relative = paths::relative_to(&home, &file);
         validate_relative(&relative)?;
         if files.contains(&relative) {
             let msg = format!("Cannot track {:?} because it is already tracked", file);
             Err(DotfilesError::new(msg))?
         }
+
+        let deleted = self.get_deleted();
         if deleted.contains(&relative) {
             let msg = format!("Cannot track {:?} because it has been deleted", file);
             Err(DotfilesError::new(msg))?
@@ -326,7 +373,11 @@ impl Dotfiles {
         unix::symlink(content_path, file)?;
 
         files.push(relative);
-        Ok(Dotfiles::new(Some(files), Some(deleted)))
+        Ok(Dotfiles::new(
+            Some(files),
+            Some(self.get_executables()),
+            Some(deleted),
+        ))
     }
 
     pub fn untrack(
@@ -345,12 +396,13 @@ impl Dotfiles {
         }
 
         let mut files = self.get_files();
-        let mut deleted = self.get_deleted();
         let relative = paths::relative_to(&home, file);
         if !files.contains(&relative) {
             let msg = format!("Cannot untrack {:?} because it is not tracked", relative);
             Err(DotfilesError::new(msg))?
         }
+
+        let mut deleted = self.get_deleted();
         if deleted.contains(&relative) {
             let msg = format!(
                 "Cannot untrack {:?} because it has already been deleted",
@@ -368,9 +420,59 @@ impl Dotfiles {
         confirm_delete(file)?;
         fs::remove_file(file)?;
 
-        files.remove(files.iter().position(|file| *file == relative).unwrap());
+        let mut executables = self.get_executables();
+        remove_item(&mut executables, &relative);
+        remove_item(&mut files, &relative);
+
         deleted.push(relative);
-        Ok(Dotfiles::new(Some(files), Some(deleted)))
+
+        Ok(Dotfiles::new(Some(files), Some(executables), Some(deleted)))
+    }
+
+    pub fn set_executable(
+        &self,
+        config: &Config,
+        file: &PathBuf,
+        mode: Executable,
+    ) -> Result<Dotfiles> {
+        let home = config.get_home()?;
+        if !file.starts_with(home.clone()) {
+            let msg = format!(
+                "Cannot modify executable flag of {:?} because it is not in the home directory {:?}",
+                file, home
+            );
+            Err(DotfilesError::new(msg))?
+        }
+
+        let files = self.get_files();
+        let relative = paths::relative_to(&home, file);
+        if !files.contains(&relative) {
+            let msg = format!(
+                "Cannot modify executable flag of {:?} because it is not tracked",
+                relative
+            );
+            Err(DotfilesError::new(msg))?
+        }
+
+        let mut executables = self.get_executables();
+        let contained = executables.contains(&relative);
+
+        Symlink::get(&config.contents(), &home, file).set_executable(mode)?;
+
+        match mode {
+            Executable::No => remove_item(&mut executables, &relative),
+            Executable::Yes => {
+                if !contained {
+                    executables.push(relative);
+                }
+            }
+        }
+
+        Ok(Dotfiles::new(
+            Some(files),
+            Some(executables),
+            Some(self.get_deleted()),
+        ))
     }
 
     pub fn repair(
@@ -379,13 +481,19 @@ impl Dotfiles {
         wrong_behaviour: fn(&PathBuf) -> Result<RepairAction>,
     ) -> Result<RepairResult> {
         let home = config.get_home()?;
-        info!("Attempting to repair broken symlinks in {:?}", home);
+        info!("Attempting to repair {:?}", home);
 
         let symlinks = self.get_symlinks(config.contents().as_path(), home.as_path());
+        let executables = self.get_executables();
 
         let skippeds: Result<_> = symlinks
-            .values()
-            .map(|symlink| symlink.repair(wrong_behaviour))
+            .iter()
+            .map(|(dotfile, symlink)| {
+                symlink.repair(
+                    wrong_behaviour,
+                    Executable::from(executables.contains(dotfile)),
+                )
+            })
             .collect();
 
         Ok(RepairResult::coalesce_all(skippeds?))
@@ -394,11 +502,11 @@ impl Dotfiles {
 
 #[cfg(test)]
 mod tests {
+    use crate::config::test_util::*;
+    use crate::config::Config;
+    use crate::dotfiles::*;
     use std::fs::File;
     use std::os::unix::fs as unix;
-    use crate::config::Config;
-    use crate::config::test_util::*;
-    use crate::dotfiles::*;
 
     #[test]
     fn test_empty_dotfiles() {
@@ -406,7 +514,10 @@ mod tests {
         let dotfiles = Dotfiles::load(&config).unwrap();
         dotfiles.save(&config).unwrap();
         let dotfiles = Dotfiles::load(&config).unwrap();
-        assert_eq!(dotfiles, Dotfiles::new(Some(vec![]), Some(vec![])));
+        assert_eq!(
+            dotfiles,
+            Dotfiles::new(Some(vec![]), Some(vec![]), Some(vec![]))
+        );
     }
 
     fn setup_content(config: &Config, file: &str) {
@@ -445,7 +556,11 @@ mod tests {
             setup_content(&config, f);
             setup_symlink(&config, f);
         }
-        let dotfiles = Dotfiles::new(Some(files.iter().map(PathBuf::from).collect()), Some(vec![]));
+        let dotfiles = Dotfiles::new(
+            Some(files.iter().map(PathBuf::from).collect()),
+            None,
+            Some(vec![]),
+        );
         dotfiles.check(&config).unwrap();
     }
 
@@ -453,7 +568,7 @@ mod tests {
     #[should_panic(expected = "Absent content")]
     fn test_check_failure_missing() {
         let (_dir, config) = setup_config();
-        let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(".test")]), Some(vec![]));
+        let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(".test")]), None, Some(vec![]));
         dotfiles.check(&config).unwrap();
     }
 
@@ -463,7 +578,7 @@ mod tests {
         let (_dir, config) = setup_config();
         let file = ".test";
         setup_content(&config, file);
-        let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]), Some(vec![]));
+        let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]), None, Some(vec![]));
         dotfiles.check(&config).unwrap();
     }
 
@@ -472,7 +587,7 @@ mod tests {
         let (_dir, config) = setup_config();
         let file = ".test";
         setup_content(&config, file);
-        let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]), Some(vec![]));
+        let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]), None, Some(vec![]));
         assert_eq!(
             RepairResult::Successful,
             dotfiles
@@ -488,7 +603,7 @@ mod tests {
         let file = ".test";
         setup_content(&config, file);
         setup_symlink_wrong(&config, file);
-        let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]), Some(vec![]));
+        let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]), None, Some(vec![]));
         assert_eq!(
             RepairResult::Successful,
             dotfiles
@@ -505,7 +620,7 @@ mod tests {
         let file = ".test";
         setup_content(&config, file);
         setup_symlink_wrong(&config, file);
-        let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]), Some(vec![]));
+        let dotfiles = Dotfiles::new(Some(vec![PathBuf::from(file)]), None, Some(vec![]));
         assert_eq!(
             RepairResult::Skipped,
             dotfiles

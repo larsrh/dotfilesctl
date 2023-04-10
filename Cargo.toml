@@ -13,6 +13,7 @@ An application for tracking dotfiles, without assumptions about the backend stor
 
 [dependencies]
 anyhow = "^1.0"
+bitflags = "^2.1"
 clap = { version = "^3", features = ["cargo", "yaml"] }
 clap_complete = "^3"
 dirs = "^5.0"

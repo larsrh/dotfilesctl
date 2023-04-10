@@ -1,4 +1,4 @@
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 
 pub fn relative_to(from: &Path, to: &Path) -> PathBuf {
     fn go(buf: &mut PathBuf, from: &Path, to: &Path) {
@@ -15,31 +15,30 @@ pub fn relative_to(from: &Path, to: &Path) -> PathBuf {
     buf
 }
 
-#[allow(dead_code)]
-pub fn canonicalize_light<P: AsRef<Path>>(path: P) -> PathBuf {
-    let mut buf = PathBuf::new();
-    for component in path.as_ref().components() {
-        match component {
-            Component::Prefix(_) | Component::RootDir | Component::Normal(_) => {
-                buf.push(PathBuf::from(component.as_os_str()))
-            }
-            Component::CurDir => {}
-            Component::ParentDir => {
-                if buf.file_name().is_none() {
-                    buf.push(PathBuf::from(component.as_os_str()));
-                } else {
-                    buf.pop();
-                }
-            }
-        };
-    }
-    buf
-}
-
 #[cfg(test)]
 mod tests {
     use crate::paths::*;
-    use std::path::Path;
+    use std::path::{Component, Path};
+
+    fn canonicalize_light<P: AsRef<Path>>(path: P) -> PathBuf {
+        let mut buf = PathBuf::new();
+        for component in path.as_ref().components() {
+            match component {
+                Component::Prefix(_) | Component::RootDir | Component::Normal(_) => {
+                    buf.push(PathBuf::from(component.as_os_str()))
+                }
+                Component::CurDir => {}
+                Component::ParentDir => {
+                    if buf.file_name().is_none() {
+                        buf.push(PathBuf::from(component.as_os_str()));
+                    } else {
+                        buf.pop();
+                    }
+                }
+            };
+        }
+        buf
+    }
 
     fn assert_relative_to(from: &str, to: &str, res: &str) {
         let from = Path::new(from);
