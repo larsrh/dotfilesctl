@@ -4,7 +4,6 @@ extern crate anyhow;
 extern crate clap;
 extern crate clap_complete;
 extern crate dirs;
-extern crate env_logger;
 extern crate fs_extra;
 #[macro_use]
 extern crate log;

@@ -139,7 +139,7 @@ mod test {
     fn test_set_executable() {
         let file = NamedTempFile::new().unwrap();
         let path = file.path();
-        fs::set_permissions(path.clone(), Permissions::from_mode(0o0644)).unwrap();
+        fs::set_permissions(path, Permissions::from_mode(0o0644)).unwrap();
         Executable::Yes.set(&path.to_path_buf()).unwrap();
         assert_eq!(
             0o755,
